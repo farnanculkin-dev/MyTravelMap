@@ -1,6 +1,11 @@
 {
   "type": "Topology",
-  "objects": {},
+  "objects": {
+    "ne_10m_admin_0_countries": {
+      "type": "GeometryCollection",
+      "geometries": []
+    }
+  },
   "arcs": [],
   "transform": {"scale": [1,1], "translate": [0,0]}
 }
