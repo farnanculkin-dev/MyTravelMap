@@ -1,24 +1,26 @@
-
 {
   "name": "mytravelmap",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "vite",
+    "generate:topo": "node scripts/generate-topo.mjs",
     "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
-    "d3-geo": "4.1.0",
+    "d3-geo": "3.1.1",
+    "polygon-clipping": "^0.15.7",
     "react": "18.2.0",
     "react-dom": "18.2.0",
-    "topojson-client": "3.1.0"
+    "topojson-client": "3.1.0",
+    "topojson-server": "3.0.1"
   },
   "devDependencies": {
     "@types/react": "18.0.28",
     "@types/react-dom": "18.0.11",
+    "@vitejs/plugin-react": "4.2.1",
     "typescript": "5.2.2",
-    "vite": "5.2.0",
-    "@vitejs/plugin-react": "4.0.0"
+    "vite": "5.2.0"
   }
 }

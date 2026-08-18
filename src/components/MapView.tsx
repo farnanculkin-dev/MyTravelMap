@@ -5,6 +5,14 @@ import countries from '../data/countries.json'
 import { feature } from 'topojson-client'
 import * as d3 from 'd3-geo'
 
+const MAP_COLORS = [
+  { name: 'Green', value: '#4fb6a1' },
+  { name: 'Blue', value: '#4f86c6' },
+  { name: 'Red', value: '#d95d5d' },
+  { name: 'Orange', value: '#e59a4a' },
+  { name: 'Purple', value: '#8b6bb1' },
+]
+
 export default function MapView({
   profile,
   onBack,
@@ -15,12 +23,15 @@ export default function MapView({
   travelRepo: TravelRepository
 }) {
   const [visited, setVisited] = useState<Set<string>>(new Set())
+  const [mapColor, setMapColor] = useState(MAP_COLORS[0].value)
   const [geoFeatures, setGeoFeatures] = useState<any[]>([])
+  const [contextFeatures, setContextFeatures] = useState<any[]>([])
   const [missing, setMissing] = useState<string[]>([])
 
   useEffect(() => {
     const v = new Set(travelRepo.getVisited(profile))
     setVisited(v)
+    setMapColor(travelRepo.getMapColor(profile) || MAP_COLORS[0].value)
   }, [profile])
 
   useEffect(() => {
@@ -29,54 +40,36 @@ export default function MapView({
       .then((r) => r.json())
       .then((topology) => {
         if (cancelled) return
-        // Attempt to detect the object name containing geometries
-        const keys = Object.keys((topology && topology.objects) || {})
-        if (keys.length === 0) {
+        const mapObject = topology?.objects?.countries
+        if (!mapObject) {
           console.error('TopoJSON contains no objects')
           return
         }
-        // Combine all objects into one feature list
-        const allFeatures: any[] = []
-        keys.forEach((k) => {
-          const fc = feature(topology, topology.objects[k])
-          if (fc && fc.features) allFeatures.push(...fc.features)
-        })
-
-        // Map features by name property (various datasets use NAME, name, NAME_EN, etc.)
-        const nameProps = ['NAME_EN', 'NAME', 'name', 'NAME_LONG', 'admin']
-        const byName: Record<string, any> = {}
-        allFeatures.forEach((f) => {
-          const props = f.properties || {}
-          let nameVal: string | null = null
-          for (const p of nameProps) {
-            if (props[p]) {
-              nameVal = String(props[p])
-              break
-            }
-          }
-          if (!nameVal) {
-            // fallback to using ISO_A2 or similar
-            if (props.ISO_A2) nameVal = props.ISO_A2
-            else if (props.iso_a2) nameVal = props.iso_a2
-          }
-          if (nameVal) {
-            byName[nameVal] = f
-          }
-        })
-
-        // Match countries.json topoName to features
+        const mapFeatures = [mapObject, topology?.objects?.russia]
+          .filter(Boolean)
+          .flatMap((mapObjectPart: any) => {
+            const decoded = feature(topology, mapObjectPart) as any
+            return decoded.features || [decoded]
+          })
+        const contextFeatureCollection = topology?.objects?.context
+          ? feature(topology, topology.objects.context)
+          : null
+        const byMapId = new Map(
+          mapFeatures.map((mapFeature: any) => [mapFeature.properties?.mapId, mapFeature]),
+        )
         const featuresMatched: any[] = []
         const missingList: string[] = []
         countries.forEach((c: any) => {
-          const topoKey = c.topoName
-          if (byName[topoKey]) {
-            featuresMatched.push({ ...byName[topoKey], travelId: c.id })
+          const mapFeature = byMapId.get(c.id)
+          if (mapFeature) {
+            featuresMatched.push({ ...mapFeature, travelId: c.id })
           } else {
-            missingList.push(`${c.id} (${c.name}) -> ${topoKey}`)
+            missingList.push(`${c.id} (${c.name})`)
           }
         })
 
         setGeoFeatures(featuresMatched)
+        setContextFeatures(contextFeatureCollection?.features || (contextFeatureCollection ? [contextFeatureCollection] : []))
         setMissing(missingList)
         if (missingList.length > 0) console.warn('Missing countries:', missingList)
       })
@@ -94,8 +87,13 @@ export default function MapView({
     travelRepo.setVisited(profile, Array.from(next))
   }
 
-  // Create a projection and path generator
-  const projection = d3.geoMercator().center([15, 54]).scale(600).translate([480, 350])
+  function selectMapColor(color: string) {
+    setMapColor(color)
+    travelRepo.setMapColor(profile, color)
+  }
+
+  // Keep the Milestone 1 view fixed to Europe and nearby North Africa.
+  const projection = d3.geoMercator().center([8, 52]).scale(500).translate([480, 460])
   const pathGen = d3.geoPath().projection(projection as any)
 
   return (
@@ -105,10 +103,25 @@ export default function MapView({
           ← Back
         </button>
         <h2>{profile.charAt(0).toUpperCase() + profile.slice(1)}’s Map</h2>
+        <div className="map-colors" aria-label="Map colour">
+          {MAP_COLORS.map((color) => (
+            <button
+              className={`color-swatch${mapColor === color.value ? ' selected' : ''}`}
+              key={color.value}
+              type="button"
+              aria-label={`${color.name} map colour`}
+              aria-pressed={mapColor === color.value}
+              title={color.name}
+              style={{ backgroundColor: color.value }}
+              onClick={() => selectMapColor(color.value)}
+            />
+          ))}
+        </div>
         <div className="visited-count">Countries visited: {visited.size}</div>
       </header>
 
-      <div className="map-container">
+      <div className="map-workspace">
+        <div className="map-container">
         {missing.length > 0 && (
           <div style={{ padding: 8, background: '#fff3f3', border: '1px solid #ffcccc', marginBottom: 10 }}>
             <strong>Unmatched countries:</strong>
@@ -122,26 +135,56 @@ export default function MapView({
           </div>
         )}
 
-        <svg viewBox="0 0 960 700" className="svg-map" role="img" aria-label="Europe map">
-          <g>
-            {geoFeatures.map((f, i) => {
-              const countryId = f.travelId
-              const isVisited = visited.has(countryId)
-              const d = pathGen(f as any) || undefined
-              return (
+          <svg viewBox="0 0 960 920" className="svg-map" role="img" aria-label="Europe map">
+            <g>
+              {contextFeatures.map((f) => (
                 <path
-                  key={countryId}
-                  d={d}
-                  fill={isVisited ? '#4fb6a1' : '#ffffff'}
+                  key={f.properties?.contextId}
+                  data-context-id={f.properties?.contextId}
+                  d={pathGen(f as any) || undefined}
+                  fill="#ffffff"
                   stroke="#000"
                   strokeWidth={0.5}
-                  onClick={() => toggleCountry(countryId)}
-                  style={{ cursor: 'pointer' }}
+                  aria-hidden="true"
                 />
-              )
-            })}
-          </g>
-        </svg>
+              ))}
+              {geoFeatures.map((f) => {
+                const countryId = f.travelId
+                const isVisited = visited.has(countryId)
+                const d = pathGen(f as any) || undefined
+                return (
+                  <path
+                    key={countryId}
+                    data-country-id={countryId}
+                    d={d}
+                    fill={isVisited ? mapColor : '#ffffff'}
+                    stroke="#000"
+                    strokeWidth={0.5}
+                    onClick={() => toggleCountry(countryId)}
+                    style={{ cursor: 'pointer' }}
+                  />
+                )
+              })}
+            </g>
+          </svg>
+        </div>
+
+        <aside className="country-checklist" aria-label="Country checklist">
+          <h3>Countries</h3>
+          <div className="country-list">
+            {countries.map((country: any) => (
+              <label className="country-row" key={country.id}>
+                <input
+                  type="checkbox"
+                  checked={visited.has(country.id)}
+                  onChange={() => toggleCountry(country.id)}
+                  style={{ accentColor: mapColor }}
+                />
+                <span>{country.name}</span>
+              </label>
+            ))}
+          </div>
+        </aside>
       </div>
     </div>
   )
