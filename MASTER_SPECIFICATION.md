@@ -1151,3 +1151,896 @@ The next successful outcome should be:
 > Mum, Dad, Amelia, Dylan and Cian can open Family Atlas, select their profile, tap countries they have visited, see them change colour, close the browser, return later and see their map exactly as they left it.
 
 Once that works reliably, Family Atlas has officially begun.
+# MASTER_SPECIFICATION.md — Post-V1 Product Direction Update
+
+## Product Direction Update — 19 August 2026
+
+This section records the product direction agreed after the successful release and family testing of Family Atlas Version 1.
+
+It should be read together with the existing Master Specification.
+
+The original specification remains valid as the historical and long-term foundation of the project. This update reflects important product and architectural decisions that emerged during the Version 1 build and early deployment.
+
+---
+
+# 41. Version 1 Status
+
+Family Atlas Version 1 is now considered released.
+
+Version 1 successfully provides:
+
+* five family profiles
+* independent profile travel maps
+* clickable European geography
+* separate England, Scotland, Wales and Northern Ireland geography
+* Republic of Ireland separately selectable
+* visited-country checklist
+* synchronized map/checklist state
+* visited-country counter
+* profile colour selection
+* local browser persistence
+* profile persistence through URL state
+* group photograph
+* individual profile photographs
+* responsive desktop, tablet and mobile layouts
+* live Vercel deployment
+
+Version 1 has been tested successfully on:
+
+* desktop
+* mobile phone
+* tablet
+
+The Version 1 map geography, framing, scale and core interaction are considered complete.
+
+Version 1 should now be treated as **frozen** except for genuine bugs discovered through family use.
+
+Do not continue adding speculative Version 1 functionality.
+
+New functionality should normally be developed as part of Version 2 or later milestones.
+
+---
+
+# 42. Family Atlas Is Now a Product Architecture
+
+Family Atlas began as an application for one family.
+
+From Version 2 onward, it should be architected so that the original family is simply the **first Family Atlas user/account**, rather than being permanently hard-coded into the application.
+
+Development should therefore support the possibility that Family Atlas may eventually be used by:
+
+* other families
+* couples
+* extended families
+* groups of friends
+* individuals
+* frequent travellers
+* future commercial customers
+
+This does **not** mean that commercial infrastructure, subscriptions or public sign-up systems should now be built prematurely.
+
+The principle is:
+
+> Build Family Atlas for the current family first, while ensuring that each new architectural layer could later support many independent families and individuals.
+
+---
+
+# 43. Customer Zero Principle
+
+The original family should be treated as **Customer Zero**.
+
+The project should continue to be designed and tested around genuine family use.
+
+Before building major new functionality, ask:
+
+> Does the current family actually need or value this?
+
+Real family behaviour should guide development.
+
+Examples:
+
+* Do family members naturally update their maps?
+* Do they add photographs?
+* Do they record memories?
+* Do they return to the application after trips?
+* Do they ask for new features without prompting?
+
+Commercial assumptions should not override real user behaviour.
+
+---
+
+# 44. Top-Level Atlas Structure
+
+Version 2 should introduce a reusable top-level ownership model.
+
+Potential concept:
+
+```text
+Atlas
+│
+├── Family
+│   ├── Profiles
+│   ├── Trips
+│   ├── Places
+│   ├── Memories
+│   └── Media
+│
+└── Individual
+    ├── Trips
+    ├── Places
+    ├── Memories
+    └── Media
+```
+
+The final implementation naming may change, but the architecture must support both:
+
+* a shared family Atlas
+* a personal/individual Atlas
+
+Do not assume every Atlas will have children or multiple members.
+
+---
+
+# 45. Family Entity
+
+For family use, introduce a **Family** entity.
+
+Example:
+
+```json
+{
+  "id": "family_123",
+  "name": "Culkin Family",
+  "groupPhoto": "...",
+  "members": [...]
+}
+```
+
+The Family becomes the shared container for:
+
+* family identity
+* group photograph
+* family members
+* shared trips
+* shared memories
+* shared media
+* permissions
+* future family connections
+
+Profile IDs must remain stable.
+
+Do not use display names as permanent database identifiers.
+
+---
+
+# 46. Individual Profiles
+
+Each family member should have a personal profile within the Family Atlas.
+
+Each profile may eventually contain:
+
+* name
+* profile photograph
+* preferred map colour
+* countries visited
+* cities visited
+* places visited
+* trips
+* personal memories
+* photographs
+* videos
+* notes
+* favourite destinations
+* statistics
+* travel wish list
+
+Each user should be able to manage their own profile where appropriate.
+
+The long-term interaction should not depend on one administrator manually maintaining every person's information.
+
+Examples:
+
+* Mum can update Mum's profile.
+* Dad can update Dad's profile.
+* Dylan can update Dylan's profile.
+* Cian can update Cian's profile.
+
+Administrator controls may still exist for safeguarding, family management and recovery.
+
+---
+
+# 47. Version 2A — Shared Family Atlas
+
+The first major Version 2 milestone should be:
+
+**Shared cloud persistence across devices.**
+
+Version 2A should focus on infrastructure and shared access rather than adding many new travel features simultaneously.
+
+Primary objectives:
+
+1. Introduce a shared cloud database.
+2. Replace device-only travel state with shared family data.
+3. Store family/profile photographs centrally.
+4. Allow all authorised family devices to see the same Atlas.
+5. Introduce a reusable Family/Atlas data structure.
+6. Introduce simple private access.
+7. Preserve all Version 1 functionality.
+
+Potential architecture:
+
+```text
+TravelRepository
+      │
+      ├── LocalStorageTravelRepository
+      │
+      └── CloudTravelRepository
+```
+
+Firebase / Firestore remains a suitable candidate unless a simpler or better alternative is identified.
+
+Do not couple the UI directly to Firestore.
+
+---
+
+# 48. Private Access and Authentication Philosophy
+
+Family Atlas is intended to contain private family memories.
+
+Access must therefore become deliberate and controlled.
+
+However, authentication should remain simple and family-friendly.
+
+Avoid making children manage complicated account systems unless genuinely necessary.
+
+Possible early approach:
+
+```text
+Private Family Link
+      ↓
+Family Password / PIN
+      ↓
+Family Home Screen
+      ↓
+Select Profile
+```
+
+Later versions may support:
+
+* individual user accounts
+* parent/administrator roles
+* member roles
+* child profile PINs
+* email login
+* passwordless login
+* recovery options
+
+Do not introduce complex enterprise-style authentication prematurely.
+
+The user-facing experience should remain simple even if the underlying security becomes stronger.
+
+---
+
+# 49. Shared Data Principle
+
+From Version 2 onward, the same Atlas should appear consistently across devices.
+
+Example:
+
+Dylan marks France as visited on his tablet.
+
+Dad opens Family Atlas on a laptop.
+
+Dylan's France selection should already be visible.
+
+Likewise:
+
+* profile photographs
+* group photograph
+* memories
+* trips
+* places
+* future media
+
+should be shared across authorised devices.
+
+Device-specific `localStorage` should no longer be the primary source of truth once Version 2A is complete.
+
+---
+
+# 50. Core Long-Term Data Model
+
+The emerging long-term product model is:
+
+> **People → Trips → Places → Memories → Media**
+
+These should become core concepts in the Family Atlas architecture.
+
+---
+
+# 51. Trips
+
+A **Trip** represents a real journey or holiday.
+
+Example:
+
+```text
+French Riviera 2026
+```
+
+A trip may contain:
+
+* travellers
+* start date
+* end date
+* countries
+* cities
+* towns
+* attractions
+* accommodation
+* activities
+* restaurants
+* photographs
+* videos
+* memories
+* notes
+* cartoon episodes
+* favourite experiences
+
+Trips should allow multiple family members to share one real-world experience without duplicating the same trip information.
+
+---
+
+# 52. Places
+
+Country tracking remains important, but countries alone are too broad to represent meaningful travel history.
+
+Family Atlas should progressively support **Places**.
+
+Possible place hierarchy:
+
+```text
+Country
+   ↓
+Region / State
+   ↓
+City / Town
+   ↓
+Attraction / Place
+   ↓
+Experience
+```
+
+Examples:
+
+```text
+Denmark
+├── Copenhagen
+└── Billund
+    └── Legoland
+```
+
+```text
+France
+├── Nice
+├── Cannes
+├── Antibes
+├── Monaco day trip
+└── Verdon Gorge
+```
+
+A user should eventually be able to record any meaningful place connected to their travels.
+
+Do not require every level of the hierarchy.
+
+The experience should remain flexible.
+
+---
+
+# 53. Memories
+
+Places and trips should support personal memories.
+
+Possible memory content:
+
+* favourite moment
+* funny memory
+* favourite activity
+* favourite meal
+* favourite place
+* people met
+* surprises
+* personal notes
+* children's comments
+* stories
+* recommendations to future self
+* “would we go back?”
+
+Memories should be optional.
+
+Family Atlas should encourage memory capture without making it feel like homework.
+
+---
+
+# 54. Media
+
+Family Atlas should become a central location connecting travel experiences with media.
+
+Supported media may eventually include:
+
+* photographs
+* family videos
+* hosted videos
+* YouTube links
+* audio memories
+* scanned memorabilia
+* tickets
+* travel documents
+* cartoon episodes
+
+Large media files should not necessarily be stored directly if linking or cloud media storage is more appropriate.
+
+Storage architecture must remain scalable.
+
+---
+
+# 55. Family Atlas as a Permanent Travel Record
+
+The product should increasingly be thought of as:
+
+> **A permanent digital record of a person's or family's life through travel.**
+
+The map remains an important visual entry point.
+
+However, the long-term value comes from connecting:
+
+```text
+WHERE
++
+WHEN
++
+WHO
++
+WHAT HAPPENED
++
+MEMORIES
++
+PHOTOS / VIDEOS
+```
+
+The objective is not simply to show where someone has travelled.
+
+The objective is to preserve the story associated with those places.
+
+---
+
+# 56. Private Connections Between Families and Individuals
+
+A future version may allow users to connect with selected:
+
+* relatives
+* friends
+* other families
+* individual travellers
+
+Possible examples:
+
+```text
+Our Family
+├── Grandparents
+├── Brother's Family
+├── Wife's Family
+└── Close Friends
+```
+
+Users may be able to see selected travel updates, trips or Atlas content shared by those connections.
+
+This should remain:
+
+* private
+* permission-based
+* deliberate
+* family-oriented
+
+Do **not** turn Family Atlas into a conventional public social media network.
+
+Avoid early introduction of:
+
+* public follower counts
+* viral feeds
+* influencer mechanics
+* popularity rankings
+* algorithmic engagement loops
+
+The objective of connectivity is:
+
+> Help people remain connected through meaningful travel stories and shared memories.
+
+---
+
+# 57. Sharing Philosophy
+
+Users should eventually control what they share.
+
+Possible privacy levels:
+
+* private to me
+* private to my family
+* shared with selected connections
+* shareable by private link
+* public only where explicitly chosen
+
+Children's information should default to more restrictive privacy.
+
+Never expose:
+
+* precise live locations
+* schools
+* home addresses
+* sensitive personal information
+
+without deliberate user action.
+
+---
+
+# 58. Timeline
+
+A long-term Family Atlas timeline becomes increasingly valuable as Trips, Places and Memories accumulate.
+
+Example:
+
+```text
+2026
+
+Italy
+First family skiing holiday
+
+France
+French Riviera holiday
+
+Estonia
+Family wedding
+
+Sweden
+Stockholm
+
+Leo joins the family
+```
+
+The timeline may eventually combine travel with selected broader family milestones.
+
+Travel should remain the primary organising theme unless the product naturally evolves further.
+
+---
+
+# 59. Search and AI
+
+AI should only be introduced where it materially improves the travel-memory experience.
+
+Potential future capabilities:
+
+* identify likely trips from uploaded photos
+* suggest dates and places from photo metadata
+* generate draft trip summaries
+* generate family travel yearbooks
+* search memories conversationally
+* produce children's stories from real experiences
+* create Dylan & Cian Adventures story ideas
+* identify forgotten memories
+* organise large photo sets by trip
+* answer questions about family travel history
+
+Example future queries:
+
+> Show me every beach holiday we took when the boys were under ten.
+
+> Where did we travel in 2030?
+
+> Which countries has Mum visited that Dad hasn't?
+
+> Create Dylan's childhood travel story.
+
+AI should augment human memory, not replace it.
+
+---
+
+# 60. Dylan & Cian Adventures
+
+The connection between real travel experiences and the Dylan & Cian Adventures cartoon project remains strategically important.
+
+Potential relationship:
+
+```text
+Real Trip
+      ↓
+Places
+      ↓
+Photos / Memories
+      ↓
+Family Story
+      ↓
+Dylan & Cian Cartoon Episode
+```
+
+A trip page may eventually link directly to its associated cartoon episode.
+
+Family Atlas may also help generate future cartoon story ideas from real travel memories.
+
+Do not build this integration before the underlying Trip/Place/Memory architecture exists.
+
+---
+
+# 61. Geography Learning
+
+The geography-learning opportunity remains valid.
+
+Future child-friendly functionality may include:
+
+* capitals
+* flags
+* currencies
+* languages
+* geographic facts
+* quizzes
+* visited-country questions
+* map challenges
+
+Travel history should make learning personally relevant.
+
+Example:
+
+> Which country did we visit when we went skiing?
+
+This remains a later milestone.
+
+---
+
+# 62. Wish Lists and Future Travel
+
+Users may eventually maintain:
+
+* countries they want to visit
+* cities they want to visit
+* attractions
+* experiences
+* restaurants
+* saved recommendations
+
+This creates a bridge between:
+
+```text
+PAST TRAVEL
+      +
+CURRENT MEMORIES
+      +
+FUTURE TRAVEL
+```
+
+Do not build full travel planning functionality before the memory/archive product has proven useful.
+
+---
+
+# 63. Commercial Product Potential
+
+Family Atlas may eventually become a commercial product.
+
+Possible revenue models include:
+
+* premium subscriptions
+* family subscriptions
+* increased cloud/media storage
+* physical travel books
+* printed family maps
+* annual travel yearbooks
+* premium AI functionality
+* affiliate travel bookings
+* contextual recommendations
+* destination partnerships
+* selected sponsorships
+
+Commercial development is **not currently the primary milestone**.
+
+Do not build:
+
+* subscriptions
+* payment systems
+* advertising infrastructure
+* affiliate systems
+
+until genuine user behaviour validates the product.
+
+The first objective remains:
+
+> Create a product that families genuinely continue using.
+
+---
+
+# 64. Monetisation Philosophy
+
+If commercialisation occurs, prioritise monetisation that naturally supports the user's travel experience.
+
+Preferred examples:
+
+* useful travel recommendations
+* bookings
+* physical memory products
+* additional storage
+* premium organisation/AI tools
+
+Avoid degrading trust through intrusive advertising.
+
+Family Atlas may eventually contain decades of private family history.
+
+Trust is therefore a core product asset.
+
+Do not treat user data as an advertising commodity.
+
+---
+
+# 65. Product Success Metric
+
+The most important early product question is not:
+
+> How many features does Family Atlas contain?
+
+or:
+
+> How much can we charge?
+
+The more important question is:
+
+> When a family returns from a trip, do they naturally think, “We need to put this into Family Atlas”?
+
+If this behaviour develops naturally, Family Atlas is becoming a habit rather than simply an application.
+
+That behaviour should guide future development.
+
+---
+
+# 66. Development Discipline After Version 1
+
+Continue using the established workflow:
+
+### Product Owner
+
+Defines:
+
+* desired family experience
+* product priorities
+* user feedback
+* final decisions
+
+### ChatGPT — Product / Solution Architect
+
+Responsible for:
+
+* maintaining product direction
+* updating specifications
+* designing architecture
+* challenging premature complexity
+* defining milestones
+* converting requirements into precise Copilot tasks
+* reviewing implementation results
+
+### GitHub Copilot — Coding Agent
+
+Responsible for:
+
+* implementation
+* code changes
+* builds
+* tests
+* technical reporting
+
+Copilot must not independently redefine product scope.
+
+Before significant work:
+
+> Read `MASTER_SPECIFICATION.md`.
+
+For scoped work:
+
+> Implement only the requested task and do not change unrelated functionality.
+
+---
+
+# 67. Version 2 Development Order
+
+The recommended Version 2 development sequence is:
+
+## Version 2A — Shared Atlas
+
+1. Define reusable Atlas / Family / Profile data model.
+2. Introduce cloud persistence.
+3. Migrate visited-country data from local-only architecture.
+4. Share profile colours across devices.
+5. Share group/profile photos across devices.
+6. Introduce simple private family access.
+7. Establish member/admin permissions.
+8. Verify desktop/mobile/tablet experience.
+9. Test extensively with Customer Zero family.
+
+## Version 2B — Trips and Places
+
+1. Introduce Trip entity.
+2. Introduce Places.
+3. Support countries, cities and attractions.
+4. Associate multiple profiles with a trip.
+5. Add trip dates/years.
+6. Introduce basic trip page.
+
+## Version 2C — Memories and Media
+
+1. Add memories.
+2. Add photographs.
+3. Add captions.
+4. Add video links.
+5. Add favourite experiences.
+6. Begin family timeline.
+
+Do not attempt Versions 2A, 2B and 2C simultaneously.
+
+---
+
+# 68. Immediate Next Milestone
+
+The immediate next milestone is:
+
+> **Transform Family Atlas from a device-specific Version 1 application into a shared, private Family Atlas that works consistently across authorised family devices.**
+
+Success means:
+
+* the family opens one shared Family Atlas
+* each person has their own profile
+* members can manage appropriate personal information
+* visited-country data is shared
+* photographs are shared
+* the same family information appears on every authorised device
+* access remains private
+* the experience remains simple and child-friendly
+
+Do not begin Trips, Places, Memories or social connectivity until this shared foundation is stable.
+
+---
+
+# 69. Updated Core Rule
+
+When considering a new feature, ask two questions:
+
+> **Will this make it easier or more enjoyable for people to record, remember, explore or share their travels?**
+
+and:
+
+> **Does this need to be built now, or can it wait until the current milestone is proven?**
+
+A feature should normally satisfy both before being added.
+
+---
+
+# 70. Updated Long-Term Vision
+
+Imagine Family Atlas twenty years from now.
+
+A family member could open it and explore:
+
+* every country they visited
+* every city they remember
+* major trips
+* childhood holidays
+* photographs
+* videos
+* favourite memories
+* places they loved
+* family stories
+* cartoon adventures
+* grandparents' travels
+* trips shared with relatives
+* places they still want to visit
+
+The Atlas would not simply show where the family travelled.
+
+It would preserve:
+
+> **the story of their lives through the places they experienced together.**
+
+That is the long-term direction of Family Atlas.
