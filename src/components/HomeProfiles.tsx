@@ -1,25 +1,91 @@
-import React from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import type { ProfileId } from '../App'
+import { compressImage, getStoredImage, storeImage } from '../lib/ImageStorage'
+
+const profiles: { id: ProfileId; label: string }[] = [
+  { id: 'mum', label: 'Mum' },
+  { id: 'dad', label: 'Dad' },
+  { id: 'amelia', label: 'Amelia' },
+  { id: 'dylan', label: 'Dylan' },
+  { id: 'cian', label: 'Cian' },
+]
 
 export default function HomeProfiles({ onSelect }: { onSelect: (p: ProfileId) => void }) {
-  const profiles: { id: ProfileId; label: string }[] = [
-    { id: 'mum', label: 'Mum' },
-    { id: 'dad', label: 'Dad' },
-    { id: 'amelia', label: 'Amelia' },
-    { id: 'dylan', label: 'Dylan' },
-    { id: 'cian', label: 'Cian' },
-  ]
+  const [groupImage, setGroupImage] = useState<string | null>(() => getStoredImage('group'))
+  const [profileImages, setProfileImages] = useState<Record<ProfileId, string | null>>(() =>
+    Object.fromEntries(profiles.map((profile) => [profile.id, getStoredImage('profile', profile.id)])) as Record<ProfileId, string | null>,
+  )
+  const [imageError, setImageError] = useState<string | null>(null)
+  const groupInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    setGroupImage(getStoredImage('group'))
+    setProfileImages(Object.fromEntries(
+      profiles.map((profile) => [profile.id, getStoredImage('profile', profile.id)]),
+    ) as Record<ProfileId, string | null>)
+  }, [])
+
+  async function handleImageChange(file: File | undefined, kind: 'group' | 'profile', profileId?: ProfileId) {
+    if (!file) return
+    setImageError(null)
+    try {
+      const compressed = await compressImage(file, kind)
+      if (!storeImage(kind, compressed, profileId)) {
+        setImageError('This image could not be saved. Try a smaller photo.')
+        return
+      }
+      if (kind === 'group') setGroupImage(compressed)
+      else if (profileId) setProfileImages((current) => ({ ...current, [profileId]: compressed }))
+    } catch (error) {
+      setImageError(error instanceof Error ? error.message : 'This image could not be uploaded')
+    }
+  }
 
   return (
     <main className="home">
       <h1>Our Family Travel Map</h1>
+      <section className="group-photo-section" aria-labelledby="group-photo-title">
+        <div className="section-heading">
+          <h2 id="group-photo-title">{groupImage ? 'Family Photo' : 'Group Photo'}</h2>
+          <label className="photo-action">
+            {groupImage ? 'Change Photo' : 'Upload Photo'}
+            <input
+              ref={groupInputRef}
+              type="file"
+              accept="image/*"
+              onChange={(event) => handleImageChange(event.target.files?.[0], 'group')}
+            />
+          </label>
+        </div>
+        {groupImage ? (
+          <img className="group-photo" src={groupImage} alt="Our family" />
+        ) : (
+          <div className="group-photo-placeholder" aria-hidden="true">Add a family photograph</div>
+        )}
+      </section>
       <div className="profiles">
         {profiles.map((p) => (
-          <button key={p.id} className="profile-btn" onClick={() => onSelect(p.id)}>
-            {p.label}
-          </button>
+          <article key={p.id} className="profile-card" onClick={() => onSelect(p.id)}>
+            <button className="profile-btn" type="button">
+              {profileImages[p.id] ? (
+                <img className="profile-photo" src={profileImages[p.id] || undefined} alt="" />
+              ) : (
+                <span className="profile-placeholder" aria-hidden="true">{p.label.charAt(0)}</span>
+              )}
+              <span>{p.label}</span>
+            </button>
+            <label className="profile-photo-action" onClick={(event) => event.stopPropagation()}>
+              {profileImages[p.id] ? 'Change photo' : 'Add photo'}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(event) => handleImageChange(event.target.files?.[0], 'profile', p.id)}
+              />
+            </label>
+          </article>
         ))}
       </div>
+      {imageError && <p className="image-error" role="alert">{imageError}</p>}
       <p className="hint">Tap a profile to view and edit their travel map.</p>
     </main>
   )

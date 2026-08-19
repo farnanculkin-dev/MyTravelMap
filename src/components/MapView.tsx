@@ -13,6 +13,48 @@ const MAP_COLORS = [
   { name: 'Purple', value: '#8b6bb1' },
 ]
 
+function simplifyRing(ring: number[][], tolerance: number): number[][] {
+  if (ring.length <= 3) return ring
+  const squaredTolerance = tolerance * tolerance
+  const keep = new Uint8Array(ring.length)
+  keep[0] = 1
+  keep[ring.length - 1] = 1
+  const simplify = (start: number, end: number) => {
+    let furthest = -1
+    let furthestDistance = squaredTolerance
+    const [startX, startY] = ring[start]
+    const [endX, endY] = ring[end]
+    const deltaX = endX - startX
+    const deltaY = endY - startY
+    for (let index = start + 1; index < end; index += 1) {
+      const [x, y] = ring[index]
+      const distance = deltaX === 0 && deltaY === 0
+        ? (x - startX) ** 2 + (y - startY) ** 2
+        : ((x - startX) * deltaY - (y - startY) * deltaX) ** 2 / (deltaX ** 2 + deltaY ** 2)
+      if (distance > furthestDistance) {
+        furthest = index
+        furthestDistance = distance
+      }
+    }
+    if (furthest >= 0) {
+      keep[furthest] = 1
+      simplify(start, furthest)
+      simplify(furthest, end)
+    }
+  }
+  simplify(0, ring.length - 1)
+  return ring.filter((_, index) => keep[index] === 1)
+}
+
+function simplifyGeometry(geometry: any, tolerance: number): any {
+  if (geometry.type === 'Polygon') {
+    return { ...geometry, coordinates: geometry.coordinates.map((ring: number[][]) => simplifyRing(ring, tolerance)) }
+  }
+  return { ...geometry, coordinates: geometry.coordinates.map((polygon: number[][][]) =>
+    polygon.map((ring: number[][]) => simplifyRing(ring, tolerance)),
+  ) }
+}
+
 export default function MapView({
   profile,
   onBack,
@@ -25,6 +67,7 @@ export default function MapView({
   const [visited, setVisited] = useState<Set<string>>(new Set())
   const [mapColor, setMapColor] = useState(MAP_COLORS[0].value)
   const [geoFeatures, setGeoFeatures] = useState<any[]>([])
+  const [boundaryFeature, setBoundaryFeature] = useState<any | null>(null)
   const [contextFeatures, setContextFeatures] = useState<any[]>([])
   const [missing, setMissing] = useState<string[]>([])
 
@@ -69,6 +112,10 @@ export default function MapView({
         })
 
         setGeoFeatures(featuresMatched)
+        const northernIreland = featuresMatched.find((f) => f.travelId === 'GB-NIR')
+        setBoundaryFeature(northernIreland
+          ? { ...northernIreland, geometry: simplifyGeometry(northernIreland.geometry, 0.01) }
+          : null)
         setContextFeatures(contextFeatureCollection?.features || (contextFeatureCollection ? [contextFeatureCollection] : []))
         setMissing(missingList)
         if (missingList.length > 0) console.warn('Missing countries:', missingList)
@@ -93,7 +140,8 @@ export default function MapView({
   }
 
   // Keep the Milestone 1 view fixed to Europe and nearby North Africa.
-  const projection = d3.geoMercator().center([8, 52]).scale(500).translate([480, 460])
+  // Enlarged by ~30% to make Europe occupy substantially more of the map panel.
+  const projection = d3.geoMercator().center([10, 50]).scale(650).translate([500, 520])
   const pathGen = d3.geoPath().projection(projection as any)
 
   return (
@@ -165,6 +213,17 @@ export default function MapView({
                   />
                 )
               })}
+              {boundaryFeature && (
+                <path
+                  data-boundary-id="IE-GB-NIR"
+                  d={pathGen(boundaryFeature as any) || undefined}
+                  fill="none"
+                  stroke="#000"
+                  strokeWidth={0.5}
+                  pointerEvents="none"
+                  aria-hidden="true"
+                />
+              )}
             </g>
           </svg>
         </div>

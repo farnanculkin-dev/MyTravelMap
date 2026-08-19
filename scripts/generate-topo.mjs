@@ -84,6 +84,28 @@ function keepEuropeanPortugalAndSpain(geometry, appId) {
     : { type: 'MultiPolygon', coordinates: retained }
 }
 
+function asMultiPolygon(geometry) {
+  return geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates
+}
+
+function isCrimea(part) {
+  const [minLongitude, minLatitude, maxLongitude, maxLatitude] = partBounds(part)
+  return minLongitude > 30 && maxLongitude < 40 && minLatitude > 43 && maxLatitude < 47
+}
+
+function moveCrimeaToUkraine(features) {
+  const russia = features.find((candidate) => candidate.properties.mapId === 'RU')
+  const ukraine = features.find((candidate) => candidate.properties.mapId === 'UA')
+  if (!russia || !ukraine) throw new Error('Could not find Ukraine and Russia features')
+
+  const russiaParts = asMultiPolygon(russia.geometry)
+  const crimeaParts = russiaParts.filter(isCrimea)
+  if (crimeaParts.length !== 1) throw new Error(`Expected one Crimea polygon in Russia, found ${crimeaParts.length}`)
+
+  russia.geometry = { type: 'MultiPolygon', coordinates: russiaParts.filter((part) => !isCrimea(part)) }
+  ukraine.geometry = { type: 'MultiPolygon', coordinates: [...asMultiPolygon(ukraine.geometry), ...crimeaParts] }
+}
+
 function offsetArcReferences(value, offset) {
   if (Array.isArray(value)) return value.map((item) => offsetArcReferences(item, offset))
   if (typeof value !== 'number') return value
@@ -134,6 +156,7 @@ const naturalFeatures = Object.values(
     return groups
   }, {}),
 )
+moveCrimeaToUkraine(naturalFeatures)
 
 const ukFeatures = await Promise.all(
   Object.entries(UK_URLS).map(async ([appId, url]) => {
@@ -153,7 +176,7 @@ const ukFeatures = await Promise.all(
 )
 
 const contextFeatures = naturalEarth.features
-  .filter((candidate) => ['LY', 'EG'].includes(naturalEarthCode(candidate.properties)))
+  .filter((candidate) => ['LY', 'EG', 'IL', 'SY', 'GE'].includes(naturalEarthCode(candidate.properties)))
   .map((candidate) => ({
     ...candidate,
     properties: {
@@ -161,7 +184,12 @@ const contextFeatures = naturalEarth.features
       contextName: candidate.properties.NAME_EN,
     },
   }))
-if (contextFeatures.length !== 2) throw new Error('Natural Earth map data does not contain Libya and Egypt')
+// Allow Georgia to be optional (may fall outside viewport after enlargement)
+const expectedContextIds = new Set(['LY', 'EG', 'IL', 'SY', 'GE'])
+const foundContextIds = new Set(contextFeatures.map((f) => f.properties.contextId))
+if (!foundContextIds.has('LY') || !foundContextIds.has('EG') || !foundContextIds.has('IL') || !foundContextIds.has('SY')) {
+  throw new Error('Natural Earth map data missing required context features (Libya, Egypt, Israel, Syria)')
+}
 
 const expectedIds = new Set(countries.map((country) => country.id))
 const combinedFeatures = [...naturalFeatures, ...ukFeatures]
