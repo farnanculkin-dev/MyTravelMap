@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import type { ProfileId } from '../App'
+import type { ProfileId } from '../domain'
 import { TravelRepository } from '../lib/TravelRepository'
 import countries from '../data/countries.json'
 import { feature } from 'topojson-client'
@@ -57,10 +57,12 @@ function simplifyGeometry(geometry: any, tolerance: number): any {
 
 export default function MapView({
   profile,
+  defaultMapColor,
   onBack,
   travelRepo,
 }: {
   profile: ProfileId
+  defaultMapColor?: string
   onBack: () => void
   travelRepo: TravelRepository
 }) {
@@ -74,8 +76,8 @@ export default function MapView({
   useEffect(() => {
     const v = new Set(travelRepo.getVisited(profile))
     setVisited(v)
-    setMapColor(travelRepo.getMapColor(profile) || MAP_COLORS[0].value)
-  }, [profile])
+    setMapColor(travelRepo.getMapColor(profile) || defaultMapColor || MAP_COLORS[0].value)
+  }, [defaultMapColor, profile, travelRepo])
 
   useEffect(() => {
     let cancelled = false

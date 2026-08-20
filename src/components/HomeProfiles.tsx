@@ -1,16 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
-import type { ProfileId } from '../App'
+import type { Profile, ProfileId } from '../domain'
 import { compressImage, getStoredImage, storeImage } from '../lib/ImageStorage'
 
-const profiles: { id: ProfileId; label: string }[] = [
-  { id: 'mum', label: 'Mum' },
-  { id: 'dad', label: 'Dad' },
-  { id: 'amelia', label: 'Amelia' },
-  { id: 'dylan', label: 'Dylan' },
-  { id: 'cian', label: 'Cian' },
-]
-
-export default function HomeProfiles({ onSelect }: { onSelect: (p: ProfileId) => void }) {
+export default function HomeProfiles({ profiles, onSelect }: { profiles: Profile[]; onSelect: (p: ProfileId) => void }) {
   const [groupImage, setGroupImage] = useState<string | null>(() => getStoredImage('group'))
   const [profileImages, setProfileImages] = useState<Record<ProfileId, string | null>>(() =>
     Object.fromEntries(profiles.map((profile) => [profile.id, getStoredImage('profile', profile.id)])) as Record<ProfileId, string | null>,
@@ -70,9 +62,9 @@ export default function HomeProfiles({ onSelect }: { onSelect: (p: ProfileId) =>
               {profileImages[p.id] ? (
                 <img className="profile-photo" src={profileImages[p.id] || undefined} alt="" />
               ) : (
-                <span className="profile-placeholder" aria-hidden="true">{p.label.charAt(0)}</span>
+                <span className="profile-placeholder" aria-hidden="true">{p.name.charAt(0)}</span>
               )}
-              <span>{p.label}</span>
+              <span>{p.name}</span>
             </button>
             <label className="profile-photo-action" onClick={(event) => event.stopPropagation()}>
               {profileImages[p.id] ? 'Change photo' : 'Add photo'}

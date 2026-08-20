@@ -1,9 +1,18 @@
 import type { TravelRepository } from './TravelRepository'
+import type { ProfileTravel } from '../domain'
 
 const KEY_PREFIX = 'mytravelmap:v1:profile:'
 const COLOR_SUFFIX = ':map-color'
 
 export class LocalStorageTravelRepository implements TravelRepository {
+  getProfileTravel(profileId: string): ProfileTravel {
+    return { profileId, visitedCountryIds: this.getVisited(profileId) }
+  }
+
+  setProfileTravel(profileTravel: ProfileTravel): void {
+    this.setVisited(profileTravel.profileId, profileTravel.visitedCountryIds)
+  }
+
   getVisited(profileId: string): string[] {
     try {
       const raw = localStorage.getItem(KEY_PREFIX + profileId)

@@ -3,12 +3,15 @@ import HomeProfiles from './components/HomeProfiles'
 import MapView from './components/MapView'
 import { LocalStorageTravelRepository } from './lib/LocalStorageTravelRepository'
 import { TravelRepository } from './lib/TravelRepository'
+import type { ProfileId } from './domain'
+import { CUSTOMER_ZERO_ATLAS, CUSTOMER_ZERO_PROFILES, isCustomerZeroProfileId } from './data/customerZero'
+import { LocalSeedAtlasRepository, LocalSeedProfileRepository } from './lib/LocalSeedRepositories'
 
 const travelRepo: TravelRepository = new LocalStorageTravelRepository()
-
-export type ProfileId = 'mum' | 'dad' | 'amelia' | 'dylan' | 'cian'
-
-const VALID_PROFILES: ProfileId[] = ['mum', 'dad', 'amelia', 'dylan', 'cian']
+const atlasRepo = new LocalSeedAtlasRepository(CUSTOMER_ZERO_ATLAS)
+const profileRepo = new LocalSeedProfileRepository(CUSTOMER_ZERO_PROFILES)
+const atlas = atlasRepo.getAtlas(CUSTOMER_ZERO_ATLAS.id)!
+const profiles = profileRepo.getProfiles(atlas.id)
 
 export default function App() {
   const [profile, setProfile] = useState<ProfileId | null>(null)
@@ -17,7 +20,7 @@ export default function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const urlProfile = params.get('profile')
-    if (urlProfile && VALID_PROFILES.includes(urlProfile as ProfileId)) {
+    if (urlProfile && isCustomerZeroProfileId(urlProfile)) {
       setProfile(urlProfile as ProfileId)
     }
   }, [])
@@ -36,9 +39,14 @@ export default function App() {
   return (
     <div className="app">
       {!profile ? (
-        <HomeProfiles onSelect={handleSelectProfile} />
+        <HomeProfiles profiles={profiles} onSelect={handleSelectProfile} />
       ) : (
-        <MapView profile={profile} onBack={handleBack} travelRepo={travelRepo} />
+        <MapView
+          profile={profile}
+          defaultMapColor={profiles.find((current) => current.id === profile)?.mapColour}
+          onBack={handleBack}
+          travelRepo={travelRepo}
+        />
       )}
     </div>
   )
