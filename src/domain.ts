@@ -13,6 +13,7 @@ export interface Atlas {
 
 export interface Profile {
   id: string
+  profileKey?: string
   atlasId: string
   name: string
   photoUrl?: string

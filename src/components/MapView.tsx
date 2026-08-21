@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react'
-import type { ProfileId } from '../domain'
 import { TravelRepository } from '../lib/TravelRepository'
 import countries from '../data/countries.json'
 import { feature } from 'topojson-client'
@@ -57,14 +56,24 @@ function simplifyGeometry(geometry: any, tolerance: number): any {
 
 export default function MapView({
   profile,
+  profileName,
   defaultMapColor,
   onBack,
   travelRepo,
+  cloudVisited,
+  cloudMapColor,
+  onSaveVisited,
+  onSaveMapColor,
 }: {
-  profile: ProfileId
+  profile: string
+  profileName?: string
   defaultMapColor?: string
   onBack: () => void
   travelRepo: TravelRepository
+  cloudVisited?: string[]
+  cloudMapColor?: string
+  onSaveVisited?: (visitedCountryIds: string[]) => Promise<void>
+  onSaveMapColor?: (color: string) => Promise<void>
 }) {
   const [visited, setVisited] = useState<Set<string>>(new Set())
   const [mapColor, setMapColor] = useState(MAP_COLORS[0].value)
@@ -72,12 +81,13 @@ export default function MapView({
   const [boundaryFeature, setBoundaryFeature] = useState<any | null>(null)
   const [contextFeatures, setContextFeatures] = useState<any[]>([])
   const [missing, setMissing] = useState<string[]>([])
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   useEffect(() => {
-    const v = new Set(travelRepo.getVisited(profile))
+    const v = new Set(cloudVisited || travelRepo.getVisited(profile))
     setVisited(v)
-    setMapColor(travelRepo.getMapColor(profile) || defaultMapColor || MAP_COLORS[0].value)
-  }, [defaultMapColor, profile, travelRepo])
+    setMapColor(cloudMapColor || travelRepo.getMapColor(profile) || defaultMapColor || MAP_COLORS[0].value)
+  }, [cloudMapColor, cloudVisited, defaultMapColor, profile, travelRepo])
 
   useEffect(() => {
     let cancelled = false
@@ -128,17 +138,29 @@ export default function MapView({
     }
   }, [])
 
-  function toggleCountry(countryId: string) {
+  async function toggleCountry(countryId: string) {
     const next = new Set(visited)
     if (next.has(countryId)) next.delete(countryId)
     else next.add(countryId)
     setVisited(next)
-    travelRepo.setVisited(profile, Array.from(next))
+    setSaveError(null)
+    try {
+      if (onSaveVisited) await onSaveVisited(Array.from(next))
+      else travelRepo.setVisited(profile, Array.from(next))
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Could not save travel changes.')
+    }
   }
 
-  function selectMapColor(color: string) {
+  async function selectMapColor(color: string) {
     setMapColor(color)
-    travelRepo.setMapColor(profile, color)
+    setSaveError(null)
+    try {
+      if (onSaveMapColor) await onSaveMapColor(color)
+      else travelRepo.setMapColor(profile, color)
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Could not save map colour.')
+    }
   }
 
   // Keep the Milestone 1 view fixed to Europe and nearby North Africa.
@@ -152,7 +174,7 @@ export default function MapView({
         <button className="back-btn" onClick={onBack} aria-label="Back to profiles">
           ← Back
         </button>
-        <h2>{profile.charAt(0).toUpperCase() + profile.slice(1)}’s Map</h2>
+        <h2>{profileName || (profile.charAt(0).toUpperCase() + profile.slice(1))}’s Map</h2>
         <div className="map-colors" aria-label="Map colour">
           {MAP_COLORS.map((color) => (
             <button
@@ -168,6 +190,7 @@ export default function MapView({
           ))}
         </div>
         <div className="visited-count">Countries visited: {visited.size}</div>
+        {saveError && <div className="save-error" role="alert">{saveError}</div>}
       </header>
 
       <div className="map-workspace">

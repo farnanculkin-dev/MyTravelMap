@@ -4,21 +4,24 @@ import { supabase } from './supabaseClient'
 
 type ProfileRow = {
   id: string
+  profile_key: string
   atlas_id: string
   linked_user_id: string | null
   name: string
-  photo_url: string | null
+  photo_path: string | null
+  role: Profile['role']
   map_colour: string
 }
 
 function toProfile(row: ProfileRow): Profile {
   return {
     id: row.id,
+    profileKey: row.profile_key,
     atlasId: row.atlas_id,
     name: row.name,
-    ...(row.photo_url ? { photoUrl: row.photo_url } : {}),
+    ...(row.photo_path ? { photoUrl: row.photo_path } : {}),
     mapColour: row.map_colour,
-    role: 'member',
+    role: row.role,
   }
 }
 
@@ -26,7 +29,7 @@ export class SupabaseProfileRepository implements AsyncProfileRepository {
   async getProfiles(atlasId: string): Promise<Profile[]> {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, atlas_id, linked_user_id, name, photo_url, map_colour')
+      .select('id, profile_key, atlas_id, linked_user_id, name, photo_path, map_colour, role')
       .eq('atlas_id', atlasId)
       .order('name')
 
@@ -37,7 +40,7 @@ export class SupabaseProfileRepository implements AsyncProfileRepository {
   async getProfile(atlasId: string, profileId: string): Promise<Profile | null> {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, atlas_id, linked_user_id, name, photo_url, map_colour')
+      .select('id, profile_key, atlas_id, linked_user_id, name, photo_path, map_colour, role')
       .eq('atlas_id', atlasId)
       .eq('id', profileId)
       .maybeSingle()
@@ -51,7 +54,8 @@ export class SupabaseProfileRepository implements AsyncProfileRepository {
       id: profile.id,
       atlas_id: profile.atlasId,
       name: profile.name,
-      photo_url: profile.photoUrl || null,
+      photo_path: profile.photoUrl || null,
+      profile_key: profile.profileKey || profile.id,
       map_colour: profile.mapColour,
     })
 

@@ -6,7 +6,7 @@ type AtlasRow = {
   id: string
   type: Atlas['type']
   name: string
-  group_photo_url: string | null
+  group_photo_path: string | null
   created_at: string
   updated_at: string
 }
@@ -16,7 +16,7 @@ function toAtlas(row: AtlasRow): Atlas {
     id: row.id,
     type: row.type,
     name: row.name,
-    ...(row.group_photo_url ? { groupPhotoUrl: row.group_photo_url } : {}),
+    ...(row.group_photo_path ? { groupPhotoUrl: row.group_photo_path } : {}),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -26,7 +26,7 @@ export class SupabaseAtlasRepository implements AsyncAtlasRepository {
   async getAtlas(atlasId: string): Promise<Atlas | null> {
     const { data, error } = await supabase
       .from('atlases')
-      .select('id, type, name, group_photo_url, created_at, updated_at')
+      .select('id, type, name, group_photo_path, created_at, updated_at')
       .eq('id', atlasId)
       .maybeSingle()
 
@@ -39,7 +39,7 @@ export class SupabaseAtlasRepository implements AsyncAtlasRepository {
       id: atlas.id,
       type: atlas.type,
       name: atlas.name,
-      group_photo_url: atlas.groupPhotoUrl || null,
+      group_photo_path: atlas.groupPhotoUrl || null,
       created_at: atlas.createdAt,
       updated_at: atlas.updatedAt,
     })

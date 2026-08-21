@@ -1,28 +1,32 @@
 import React, { useEffect, useRef, useState } from 'react'
-import type { Profile, ProfileId } from '../domain'
+import type { Profile } from '../domain'
 import { compressImage, getStoredImage, storeImage } from '../lib/ImageStorage'
 
-export default function HomeProfiles({ profiles, onSelect }: { profiles: Profile[]; onSelect: (p: ProfileId) => void }) {
-  const [groupImage, setGroupImage] = useState<string | null>(() => getStoredImage('group'))
-  const [profileImages, setProfileImages] = useState<Record<ProfileId, string | null>>(() =>
-    Object.fromEntries(profiles.map((profile) => [profile.id, getStoredImage('profile', profile.id)])) as Record<ProfileId, string | null>,
-  )
+export default function HomeProfiles({ profiles, onSelect, groupImage: cloudGroupImage, profileImages: cloudProfileImages, onUploadImage }: {
+  profiles: Profile[]
+  onSelect: (profileId: string) => void
+  groupImage?: string | null
+  profileImages?: Record<string, string | null>
+  onUploadImage?: (kind: 'group' | 'profile', profileId: string | undefined, imageData: string) => Promise<void>
+}) {
+  const [groupImage, setGroupImage] = useState<string | null>(() => cloudGroupImage === undefined ? getStoredImage('group') : cloudGroupImage)
+  const [profileImages, setProfileImages] = useState<Record<string, string | null>>(() => cloudProfileImages || Object.fromEntries(profiles.map((profile) => [profile.id, getStoredImage('profile', profile.id)])))
   const [imageError, setImageError] = useState<string | null>(null)
   const groupInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    setGroupImage(getStoredImage('group'))
-    setProfileImages(Object.fromEntries(
-      profiles.map((profile) => [profile.id, getStoredImage('profile', profile.id)]),
-    ) as Record<ProfileId, string | null>)
-  }, [])
+    if (cloudGroupImage !== undefined) setGroupImage(cloudGroupImage)
+    if (cloudProfileImages) setProfileImages(cloudProfileImages)
+  }, [cloudGroupImage, cloudProfileImages])
 
   async function handleImageChange(file: File | undefined, kind: 'group' | 'profile', profileId?: ProfileId) {
     if (!file) return
     setImageError(null)
     try {
       const compressed = await compressImage(file, kind)
-      if (!storeImage(kind, compressed, profileId)) {
+      if (onUploadImage) {
+        await onUploadImage(kind, profileId, compressed)
+      } else if (!storeImage(kind, compressed, profileId)) {
         setImageError('This image could not be saved. Try a smaller photo.')
         return
       }
