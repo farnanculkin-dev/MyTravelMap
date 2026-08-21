@@ -31,17 +31,35 @@ export default function App() {
   const [cloudLoading, setCloudLoading] = useState(false)
   const [cloudError, setCloudError] = useState<string | null>(null)
   const [profile, setProfile] = useState<string | null>(null)
+  const activeProfiles = cloudData?.profiles || fallbackProfiles
 
   useEffect(() => {
     let mounted = true
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       if (mounted) { setSession(currentSession); setAuthLoading(false) }
+    }).catch((error: unknown) => {
+      if (mounted) {
+        console.error('Could not restore Supabase session', error)
+        setSession(null)
+        setAuthLoading(false)
+      }
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession)
       setAuthLoading(false)
     })
     return () => { mounted = false; subscription.unsubscribe() }
+  }, [])
+
+  useEffect(() => {
+    const hasAuthHash = window.location.hash.includes('access_token=') || window.location.hash.includes('refresh_token=')
+    const params = new URLSearchParams(window.location.search)
+    const hasAuthCode = params.has('code')
+    if (hasAuthHash || hasAuthCode) {
+      params.delete('code')
+      const cleanSearch = params.toString()
+      window.history.replaceState({}, '', `${window.location.pathname}${cleanSearch ? `?${cleanSearch}` : ''}`)
+    }
   }, [])
 
   useEffect(() => {
@@ -78,6 +96,13 @@ export default function App() {
     if (urlProfile) setProfile(urlProfile)
   }, [])
 
+  useEffect(() => {
+    if (profile && !activeProfiles.some((current) => current.id === profile)) {
+      setProfile(null)
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [activeProfiles, profile])
+
   const handleSelectProfile = (profileId: string) => {
     setProfile(profileId)
     window.history.pushState({}, '', `?profile=${profileId}`)
@@ -87,6 +112,8 @@ export default function App() {
     window.history.pushState({}, '', window.location.pathname)
   }
   const handleSignOut = async () => {
+    setProfile(null)
+    window.history.replaceState({}, '', window.location.pathname)
     const { error } = await supabase.auth.signOut()
     if (error) console.error('Error signing out', error)
   }
@@ -104,7 +131,6 @@ export default function App() {
   if (membershipError && !membership) return <main className="auth-loading" role="alert"><p>{membershipError}</p></main>
   if (!membership) return <AtlasSetupScreen onCreate={handleCreateAtlas} isCreating={isCreatingAtlas} error={membershipError} onSignOut={handleSignOut} />
 
-  const activeProfiles = cloudData?.profiles || fallbackProfiles
   const activeProfile = activeProfiles.find((current) => current.id === profile)
   const uploadImage = async (kind: 'group' | 'profile', profileId: string | undefined, imageData: string) => {
     if (kind === 'group' && membership.role !== 'admin') throw new Error('Only an Atlas administrator can change the group photo.')

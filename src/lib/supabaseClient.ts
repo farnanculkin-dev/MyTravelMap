@@ -12,4 +12,11 @@ if ((!supabaseUrl || !supabasePublishableKey) && import.meta.env.DEV) {
 export const supabase = createClient(
   supabaseUrl || 'https://missing-supabase-project.invalid',
   supabasePublishableKey || 'missing-supabase-publishable-key',
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  },
 )
