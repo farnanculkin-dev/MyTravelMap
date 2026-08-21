@@ -3,6 +3,7 @@ import type { Session } from '@supabase/supabase-js'
 import AuthScreen from './components/AuthScreen'
 import AtlasSetupScreen from './components/AtlasSetupScreen'
 import CustomerZeroMigrationPanel from './components/CustomerZeroMigrationPanel'
+import MemberInvitePanel from './components/MemberInvitePanel'
 import HomeProfiles from './components/HomeProfiles'
 import MapView from './components/MapView'
 import { LocalStorageTravelRepository } from './lib/LocalStorageTravelRepository'
@@ -12,6 +13,7 @@ import { LocalSeedAtlasRepository, LocalSeedProfileRepository } from './lib/Loca
 import { supabase } from './lib/supabaseClient'
 import { createCustomerZeroAtlas, getCurrentUserAtlasMembership, type AtlasMembership } from './lib/customerZeroBootstrap'
 import { migrateCustomerZero } from './lib/customerZeroMigration'
+import { consumePendingInvitation } from './lib/memberInvitation'
 import { loadSupabaseAtlas, saveCloudMapColour, saveCloudVisited, uploadCloudMedia, type CloudAtlasData } from './lib/SupabaseAtlasRuntime'
 
 const travelRepo: TravelRepository = new LocalStorageTravelRepository()
@@ -72,7 +74,8 @@ export default function App() {
     let mounted = true
     setMembershipLoading(true)
     setMembershipError(null)
-    getCurrentUserAtlasMembership()
+    consumePendingInvitation()
+      .then(() => getCurrentUserAtlasMembership())
       .then((currentMembership) => { if (mounted) setMembership(currentMembership) })
       .catch((error: unknown) => { if (mounted) setMembershipError(error instanceof Error ? error.message : 'Could not load your Atlas membership.') })
       .finally(() => { if (mounted) setMembershipLoading(false) })
@@ -149,6 +152,7 @@ export default function App() {
         <button className="sign-out-btn" type="button" onClick={handleSignOut}>Sign out</button>
       </div>
       {membership.role === 'admin' && <CustomerZeroMigrationPanel atlasId={membership.atlasId} onMigrate={() => migrateCustomerZero(membership.atlasId)} />}
+      {membership.role === 'admin' && <MemberInvitePanel atlasId={membership.atlasId} />}
       {cloudError && <p className="cloud-error" role="alert">Cloud data could not be loaded. Showing local fallback data. {cloudError}</p>}
       {!profile ? (
         <HomeProfiles profiles={activeProfiles} onSelect={handleSelectProfile} groupImage={cloudData?.groupImage} profileImages={cloudData?.profileImages} onUploadImage={cloudData ? uploadImage : undefined} />
