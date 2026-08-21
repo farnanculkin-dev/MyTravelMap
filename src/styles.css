@@ -27,6 +27,14 @@ body{font-family:system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial;
 .auth-error{margin:4px 0 0;color:#8c2424;font-size:14px}
 .auth-toolbar{display:flex;justify-content:flex-end;align-items:center;gap:12px;margin-bottom:8px;color:#376968;font-size:13px}
 .sign-out-btn{background:transparent;color:#174f52;border:1px solid #8ebdbc;padding:6px 10px}
+.migration-panel{max-width:1280px;margin:0 auto 14px;background:#fffdf4;border:1px solid #d8c98d;border-radius:8px;padding:14px;box-sizing:border-box}
+.migration-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.migration-heading h2{margin:2px 0 0;font-size:18px}
+.migration-heading .auth-eyebrow{margin:0}
+.migration-note{margin:10px 0 0;color:#665f45;font-size:13px}
+.migration-summary{margin-top:12px;padding-top:10px;border-top:1px solid #e4dba9;font-size:13px;color:#4b4634}
+.migration-summary p{margin:5px 0}
+@media (max-width: 620px){.migration-heading{align-items:flex-start;flex-direction:column}.migration-heading .primary-btn{width:100%}}
 .home{text-align:center;padding-top:28px}
 .group-photo-section{max-width:640px;margin:20px auto 24px;background:var(--card);border:1px solid #b7d9d8;border-radius:8px;padding:14px;box-sizing:border-box}
 .section-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left}

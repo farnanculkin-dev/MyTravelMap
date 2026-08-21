@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import AuthScreen from './components/AuthScreen'
 import AtlasSetupScreen from './components/AtlasSetupScreen'
+import CustomerZeroMigrationPanel from './components/CustomerZeroMigrationPanel'
 import HomeProfiles from './components/HomeProfiles'
 import MapView from './components/MapView'
 import { LocalStorageTravelRepository } from './lib/LocalStorageTravelRepository'
@@ -15,6 +16,7 @@ import {
   getCurrentUserAtlasMembership,
   type AtlasMembership,
 } from './lib/customerZeroBootstrap'
+import { migrateCustomerZero } from './lib/customerZeroMigration'
 
 const travelRepo: TravelRepository = new LocalStorageTravelRepository()
 const atlasRepo = new LocalSeedAtlasRepository(CUSTOMER_ZERO_ATLAS)
@@ -157,6 +159,12 @@ export default function App() {
         <span>Signed in as {session.user.email || 'Family Atlas member'}</span>
         <button className="sign-out-btn" type="button" onClick={handleSignOut}>Sign out</button>
       </div>
+      {membership.role === 'admin' && (
+        <CustomerZeroMigrationPanel
+          atlasId={membership.atlasId}
+          onMigrate={() => migrateCustomerZero(membership.atlasId)}
+        />
+      )}
       {!profile ? (
         <HomeProfiles profiles={profiles} onSelect={handleSelectProfile} />
       ) : (
