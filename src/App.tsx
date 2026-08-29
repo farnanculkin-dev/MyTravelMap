@@ -5,6 +5,7 @@ import AtlasSetupScreen from './components/AtlasSetupScreen'
 import MemberInvitePanel from './components/MemberInvitePanel'
 import HomeProfiles from './components/HomeProfiles'
 import MapView from './components/MapView'
+import TripsScreen from './components/TripsScreen'
 import { LocalStorageTravelRepository } from './lib/LocalStorageTravelRepository'
 import { TravelRepository } from './lib/TravelRepository'
 import { CUSTOMER_ZERO_ATLAS, CUSTOMER_ZERO_PROFILES } from './data/customerZero'
@@ -20,6 +21,8 @@ const profileRepo = new LocalSeedProfileRepository(CUSTOMER_ZERO_PROFILES)
 const atlas = atlasRepo.getAtlas(CUSTOMER_ZERO_ATLAS.id)!
 const fallbackProfiles = profileRepo.getProfiles(atlas.id)
 
+type AppSection = 'home' | 'trips'
+
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
@@ -31,6 +34,7 @@ export default function App() {
   const [cloudLoading, setCloudLoading] = useState(false)
   const [cloudError, setCloudError] = useState<string | null>(null)
   const [profile, setProfile] = useState<string | null>(null)
+  const [section, setSection] = useState<AppSection>('home')
   const activeProfiles = cloudData?.profiles || fallbackProfiles
 
   useEffect(() => {
@@ -67,6 +71,7 @@ export default function App() {
       setMembership(null)
       setMembershipLoading(false)
       setMembershipError(null)
+      setSection('home')
       return
     }
     let mounted = true
@@ -105,15 +110,23 @@ export default function App() {
   }, [activeProfiles, profile])
 
   const handleSelectProfile = (profileId: string) => {
+    setSection('home')
     setProfile(profileId)
     window.history.pushState({}, '', `?profile=${profileId}`)
   }
   const handleBack = () => {
     setProfile(null)
+    setSection('home')
     window.history.pushState({}, '', window.location.pathname)
+  }
+  const handleOpenTrips = () => {
+    setProfile(null)
+    setSection('trips')
+    window.history.replaceState({}, '', window.location.pathname)
   }
   const handleSignOut = async () => {
     setProfile(null)
+    setSection('home')
     window.history.replaceState({}, '', window.location.pathname)
     const { error } = await supabase.auth.signOut()
     if (error) console.error('Error signing out', error)
@@ -149,10 +162,12 @@ export default function App() {
         <span>Signed in as {session.user.email || 'Family Atlas member'}</span>
         <button className="sign-out-btn" type="button" onClick={handleSignOut}>Sign out</button>
       </div>
-      {membership.role === 'admin' && <MemberInvitePanel atlasId={membership.atlasId} />}
+      {section === 'home' && !profile && membership.role === 'admin' && <MemberInvitePanel atlasId={membership.atlasId} />}
       {cloudError && <p className="cloud-error" role="alert">Cloud data could not be loaded. Showing local fallback data. {cloudError}</p>}
-      {!profile ? (
-        <HomeProfiles profiles={activeProfiles} onSelect={handleSelectProfile} groupImage={cloudData?.groupImage} profileImages={cloudData?.profileImages} onUploadImage={cloudData ? uploadImage : undefined} />
+      {section === 'trips' ? (
+        <TripsScreen atlasId={membership.atlasId} profiles={activeProfiles} onBack={handleBack} />
+      ) : !profile ? (
+        <HomeProfiles profiles={activeProfiles} onSelect={handleSelectProfile} onTrips={handleOpenTrips} groupImage={cloudData?.groupImage} profileImages={cloudData?.profileImages} onUploadImage={cloudData ? uploadImage : undefined} />
       ) : (
         <MapView
           profile={profile}
