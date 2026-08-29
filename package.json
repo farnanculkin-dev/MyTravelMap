@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "vite",
     "generate:topo": "node scripts/generate-topo.mjs",
+    "typecheck": "tsc --noEmit",
     "build": "vite build",
     "preview": "vite preview"
   },
