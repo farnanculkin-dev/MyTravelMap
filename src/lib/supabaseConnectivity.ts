@@ -8,7 +8,7 @@ export async function checkSupabaseConnectivity(): Promise<boolean> {
     return true
   }
 
-  if (error.status === 401 || error.status === 403) {
+  if (error.code === '42501') {
     console.info('[Supabase] Reachable; request was rejected by RLS without authentication.')
     return true
   }
