@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 
 function friendlyAuthError(message: string): string {
@@ -20,6 +20,13 @@ export default function AuthScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [cooldownSeconds, setCooldownSeconds] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [reviewCode, setReviewCode] = useState('')
+  const [reviewSubmitting, setReviewSubmitting] = useState(false)
+  const [reviewError, setReviewError] = useState<string | null>(null)
+
+  const isDevelopReview = useMemo(() => {
+    return window.location.hostname === 'my-travel-map-git-develop-farnanculkin-devs-projects.vercel.app'
+  }, [])
 
   useEffect(() => {
     if (cooldownSeconds <= 0) return
@@ -50,6 +57,30 @@ export default function AuthScreen() {
     }
     setCooldownSeconds(30)
     setSubmitted(true)
+  }
+
+  async function handleReviewLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!isDevelopReview || reviewSubmitting || !reviewCode.trim()) return
+    setReviewError(null)
+    setReviewSubmitting(true)
+
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
+      if (!supabaseUrl) throw new Error('Supabase is not configured for this deployment.')
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/dev-review-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reviewCode: reviewCode.trim() }),
+      })
+      const payload = await response.json() as { actionLink?: string; error?: string }
+      if (!response.ok || !payload.actionLink) throw new Error(payload.error || 'Could not start the review session.')
+      window.location.assign(payload.actionLink)
+    } catch (reviewLoginError) {
+      setReviewError(reviewLoginError instanceof Error ? reviewLoginError.message : 'Could not start the review session.')
+      setReviewSubmitting(false)
+    }
   }
 
   return (
@@ -83,6 +114,29 @@ export default function AuthScreen() {
             </button>
             {error && <p className="auth-error" role="alert">{error}</p>}
           </form>
+        )}
+
+        {isDevelopReview && (
+          <div className="dev-review-login" aria-label="Development review login">
+            <div className="dev-review-divider"><span>Development review</span></div>
+            <form className="auth-form" onSubmit={handleReviewLogin}>
+              <p>Use the review code to sign in without sending another email.</p>
+              <label htmlFor="review-code">Review code</label>
+              <input
+                id="review-code"
+                type="password"
+                autoComplete="off"
+                value={reviewCode}
+                onChange={(event) => setReviewCode(event.target.value)}
+                placeholder="Enter review code"
+                required
+              />
+              <button className="secondary-btn" type="submit" disabled={reviewSubmitting}>
+                {reviewSubmitting ? 'Opening review session...' : 'Open review session'}
+              </button>
+              {reviewError && <p className="auth-error" role="alert">{reviewError}</p>}
+            </form>
+          </div>
         )}
       </section>
     </main>
