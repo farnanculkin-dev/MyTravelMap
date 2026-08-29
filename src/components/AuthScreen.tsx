@@ -74,9 +74,15 @@ export default function AuthScreen() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reviewCode: reviewCode.trim() }),
       })
-      const payload = await response.json() as { actionLink?: string; error?: string }
-      if (!response.ok || !payload.actionLink) throw new Error(payload.error || 'Could not start the review session.')
-      window.location.assign(payload.actionLink)
+      const payload = await response.json() as { hashedToken?: string; error?: string }
+      if (!response.ok || !payload.hashedToken) throw new Error(payload.error || 'Could not start the review session.')
+
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        token_hash: payload.hashedToken,
+        type: 'magiclink',
+      })
+      if (verifyError) throw verifyError
+      setReviewSubmitting(false)
     } catch (reviewLoginError) {
       setReviewError(reviewLoginError instanceof Error ? reviewLoginError.message : 'Could not start the review session.')
       setReviewSubmitting(false)
