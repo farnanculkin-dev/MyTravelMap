@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import type { Profile, Trip } from '../domain'
 import countries from '../data/countries.json'
+import { createGuestPerson, loadGuestPeople, type GuestPerson } from '../lib/PersonRuntime'
 import { createTrip, loadTrips } from '../lib/TripRuntime'
 
 type Country = { id: string; name: string; topoName?: string }
@@ -20,6 +21,7 @@ export default function TripsScreen({ atlasId, profiles, onBack }: {
   onBack: () => void
 }) {
   const [trips, setTrips] = useState<Trip[]>([])
+  const [guestPeople, setGuestPeople] = useState<GuestPerson[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
@@ -33,8 +35,11 @@ export default function TripsScreen({ atlasId, profiles, onBack }: {
   const [participantIds, setParticipantIds] = useState<string[]>([])
   const [countryIds, setCountryIds] = useState<string[]>([])
   const [countryToAdd, setCountryToAdd] = useState('')
+  const [guestName, setGuestName] = useState('')
+  const [addingGuest, setAddingGuest] = useState(false)
 
   const personProfiles = useMemo(() => profiles.filter((profile) => profile.personId), [profiles])
+  const atlasPersonIds = useMemo(() => personProfiles.map((profile) => profile.personId!), [personProfiles])
   const selectedTrip = trips.find((trip) => trip.id === selectedTripId) || null
 
   async function refreshTrips() {
@@ -45,12 +50,34 @@ export default function TripsScreen({ atlasId, profiles, onBack }: {
     finally { setLoading(false) }
   }
 
+  async function refreshGuestPeople() {
+    try { setGuestPeople(await loadGuestPeople(atlasPersonIds)) }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'People could not be loaded.') }
+  }
+
   useEffect(() => { void refreshTrips() }, [atlasId])
+  useEffect(() => { void refreshGuestPeople() }, [atlasId, atlasPersonIds.join('|')])
 
   function toggleParticipant(personId: string) {
     setParticipantIds((current) => current.includes(personId)
       ? current.filter((id) => id !== personId)
       : [...current, personId])
+  }
+
+  async function handleAddGuest() {
+    if (!guestName.trim() || addingGuest) return
+    setAddingGuest(true)
+    setError(null)
+    try {
+      const person = await createGuestPerson(guestName)
+      setGuestPeople((current) => [...current, person].sort((a, b) => a.displayName.localeCompare(b.displayName)))
+      setParticipantIds((current) => current.includes(person.id) ? current : [...current, person.id])
+      setGuestName('')
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Person could not be added.')
+    } finally {
+      setAddingGuest(false)
+    }
   }
 
   function addCountry() {
@@ -68,6 +95,7 @@ export default function TripsScreen({ atlasId, profiles, onBack }: {
     setParticipantIds([])
     setCountryIds([])
     setCountryToAdd('')
+    setGuestName('')
   }
 
   async function handleCreate(event: React.FormEvent) {
@@ -158,7 +186,7 @@ export default function TripsScreen({ atlasId, profiles, onBack }: {
 
           <fieldset className="trip-fieldset">
             <legend>Who went?</legend>
-            <p className="trip-form-help">You are included automatically. Add any other family members who travelled.</p>
+            <p className="trip-form-help">You are included automatically. Add people from your Family Atlas or anyone else who travelled.</p>
             <div className="participant-picker">
               {personProfiles.map((profile) => (
                 <label key={profile.id}>
@@ -166,7 +194,25 @@ export default function TripsScreen({ atlasId, profiles, onBack }: {
                   {profile.name}
                 </label>
               ))}
+              {guestPeople.map((person) => (
+                <label key={person.id}>
+                  <input type="checkbox" checked={participantIds.includes(person.id)} onChange={() => toggleParticipant(person.id)} />
+                  {person.displayName}
+                </label>
+              ))}
             </div>
+            <div className="country-adder" aria-label="Add someone outside your Family Atlas">
+              <input
+                value={guestName}
+                onChange={(event) => setGuestName(event.target.value)}
+                placeholder="Add someone else, e.g. Grandad"
+                aria-label="Name of another person"
+              />
+              <button className="secondary-btn" type="button" onClick={handleAddGuest} disabled={!guestName.trim() || addingGuest}>
+                {addingGuest ? 'Adding…' : '+ Add person'}
+              </button>
+            </div>
+            <p className="trip-form-help">They do not need a Family Atlas account. Once added, you can reuse them on future trips.</p>
           </fieldset>
 
           <fieldset className="trip-fieldset">
