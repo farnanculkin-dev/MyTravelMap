@@ -19,7 +19,7 @@ export default function HomeProfiles({ profiles, onSelect, groupImage: cloudGrou
     if (cloudProfileImages) setProfileImages(cloudProfileImages)
   }, [cloudGroupImage, cloudProfileImages])
 
-  async function handleImageChange(file: File | undefined, kind: 'group' | 'profile', profileId?: ProfileId) {
+  async function handleImageChange(file: File | undefined, kind: 'group' | 'profile', profileId?: string) {
     if (!file) return
     setImageError(null)
     try {
