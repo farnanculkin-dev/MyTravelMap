@@ -40,3 +40,56 @@ jobs:
         with:
           name: dist
           path: dist
+
+  deployed-smoke:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      statuses: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Wait for Vercel deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for attempt in {1..36}; do
+            state=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/status" --jq '.statuses[] | select(.context == "Vercel") | .state' | head -n 1)
+            if [ "$state" = "success" ]; then
+              echo "Vercel deployment is ready."
+              exit 0
+            fi
+            if [ "$state" = "failure" ] || [ "$state" = "error" ]; then
+              echo "Vercel deployment failed with state: $state"
+              exit 1
+            fi
+            echo "Waiting for Vercel deployment (attempt $attempt/36, state: ${state:-pending})..."
+            sleep 10
+          done
+          echo "Timed out waiting for Vercel deployment."
+          exit 1
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install application dependencies
+        run: npm ci
+
+      - name: Install pinned Playwright runner
+        run: npm install --no-save --package-lock=false playwright@1.55.0
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run smoke test against deployed develop
+        env:
+          FAMILY_ATLAS_BASE_URL: https://my-travel-map-git-develop-farnanculkin-devs-projects.vercel.app
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: node scripts/deployed-smoke.mjs
