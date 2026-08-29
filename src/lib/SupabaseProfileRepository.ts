@@ -4,6 +4,7 @@ import { supabase } from './supabaseClient'
 
 type ProfileRow = {
   id: string
+  person_id: string
   profile_key: string
   atlas_id: string
   linked_user_id: string | null
@@ -16,6 +17,7 @@ type ProfileRow = {
 function toProfile(row: ProfileRow): Profile {
   return {
     id: row.id,
+    personId: row.person_id,
     profileKey: row.profile_key,
     atlasId: row.atlas_id,
     name: row.name,
@@ -29,7 +31,7 @@ export class SupabaseProfileRepository implements AsyncProfileRepository {
   async getProfiles(atlasId: string): Promise<Profile[]> {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, profile_key, atlas_id, linked_user_id, name, photo_path, map_colour, role')
+      .select('id, person_id, profile_key, atlas_id, linked_user_id, name, photo_path, map_colour, role')
       .eq('atlas_id', atlasId)
       .order('name')
 
@@ -40,7 +42,7 @@ export class SupabaseProfileRepository implements AsyncProfileRepository {
   async getProfile(atlasId: string, profileId: string): Promise<Profile | null> {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, profile_key, atlas_id, linked_user_id, name, photo_path, map_colour, role')
+      .select('id, person_id, profile_key, atlas_id, linked_user_id, name, photo_path, map_colour, role')
       .eq('atlas_id', atlasId)
       .eq('id', profileId)
       .maybeSingle()
@@ -52,6 +54,7 @@ export class SupabaseProfileRepository implements AsyncProfileRepository {
   async saveProfile(profile: Profile): Promise<void> {
     const { error: profileError } = await supabase.from('profiles').upsert({
       id: profile.id,
+      ...(profile.personId ? { person_id: profile.personId } : {}),
       atlas_id: profile.atlasId,
       name: profile.name,
       photo_path: profile.photoUrl || null,
