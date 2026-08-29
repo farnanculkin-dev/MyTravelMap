@@ -2,9 +2,10 @@ import React, { useEffect, useRef, useState } from 'react'
 import type { Profile } from '../domain'
 import { compressImage, getStoredImage, storeImage } from '../lib/ImageStorage'
 
-export default function HomeProfiles({ profiles, onSelect, groupImage: cloudGroupImage, profileImages: cloudProfileImages, onUploadImage }: {
+export default function HomeProfiles({ profiles, onSelect, onTrips, groupImage: cloudGroupImage, profileImages: cloudProfileImages, onUploadImage }: {
   profiles: Profile[]
   onSelect: (profileId: string) => void
+  onTrips?: () => void
   groupImage?: string | null
   profileImages?: Record<string, string | null>
   onUploadImage?: (kind: 'group' | 'profile', profileId: string | undefined, imageData: string) => Promise<void>
@@ -39,7 +40,10 @@ export default function HomeProfiles({ profiles, onSelect, groupImage: cloudGrou
 
   return (
     <main className="home">
-      <h1>Our Family Travel Map</h1>
+      <div className="home-title-row">
+        <h1>Our Family Travel Map</h1>
+        {onTrips && <button className="trips-entry-btn" type="button" onClick={onTrips}>Trips →</button>}
+      </div>
       <section className="group-photo-section" aria-labelledby="group-photo-title">
         <div className="section-heading">
           <h2 id="group-photo-title">{groupImage ? 'Family Photo' : 'Group Photo'}</h2>
