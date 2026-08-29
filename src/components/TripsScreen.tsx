@@ -3,6 +3,7 @@ import type { Profile, Trip } from '../domain'
 import countries from '../data/countries.json'
 import { createGuestPerson, loadGuestPeople, type GuestPerson } from '../lib/PersonRuntime'
 import { createTrip, loadTrips } from '../lib/TripRuntime'
+import TripContentPanel from './TripContentPanel'
 
 type Country = { id: string; name: string; topoName?: string }
 const countryList = countries as Country[]
@@ -103,25 +104,14 @@ export default function TripsScreen({ atlasId, profiles, onBack }: {
     setSaving(true)
     setError(null)
     try {
-      const id = await createTrip({
-        atlasId,
-        title,
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
-        description: description || undefined,
-        visibility,
-        participantPersonIds: participantIds,
-        countryIds,
-      })
+      const id = await createTrip({ atlasId, title, startDate: startDate || undefined, endDate: endDate || undefined, description: description || undefined, visibility, participantPersonIds: participantIds, countryIds })
       resetForm()
       setShowCreate(false)
       await refreshTrips()
       setSelectedTripId(id)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Trip could not be created.')
-    } finally {
-      setSaving(false)
-    }
+    } finally { setSaving(false) }
   }
 
   if (selectedTrip) {
@@ -135,25 +125,10 @@ export default function TripsScreen({ atlasId, profiles, onBack }: {
           <p className="auth-eyebrow">Trip</p>
           <h1>{selectedTrip.title}</h1>
           <p className="trip-dates">{tripDateLabel(selectedTrip)}</p>
-          {selectedTrip.countryIds.length > 0 && (
-            <div className="trip-tags" aria-label="Countries">
-              {selectedTrip.countryIds.map((id) => <span key={id}>{countryNames.get(id) || id}</span>)}
-            </div>
-          )}
-          <section className="trip-detail-section">
-            <h2>Who went?</h2>
-            <p>{selectedTrip.participantNames.join(', ') || 'Participants can be added later.'}</p>
-          </section>
-          {selectedTrip.description && (
-            <section className="trip-detail-section">
-              <h2>About this trip</h2>
-              <p>{selectedTrip.description}</p>
-            </section>
-          )}
-          <section className="trip-next-section">
-            <h2>Places & memories</h2>
-            <p>Places, photos and individual memories are the next V2B step. This trip is now stored safely in your Family Atlas.</p>
-          </section>
+          {selectedTrip.countryIds.length > 0 && <div className="trip-tags" aria-label="Countries">{selectedTrip.countryIds.map((id) => <span key={id}>{countryNames.get(id) || id}</span>)}</div>}
+          <section className="trip-detail-section"><h2>Who went?</h2><p>{selectedTrip.participantNames.join(', ') || 'Participants can be added later.'}</p></section>
+          {selectedTrip.description && <section className="trip-detail-section"><h2>About this trip</h2><p>{selectedTrip.description}</p></section>}
+          <TripContentPanel atlasId={atlasId} trip={selectedTrip} profiles={profiles} />
         </article>
       </main>
     )
@@ -163,104 +138,23 @@ export default function TripsScreen({ atlasId, profiles, onBack }: {
     <main className="trips-screen">
       <div className="trips-header">
         <button className="back-btn" type="button" onClick={onBack}>← Family Atlas</button>
-        <button className="primary-btn trips-add-btn" type="button" onClick={() => setShowCreate((value) => !value)}>
-          {showCreate ? 'Cancel' : '+ Add trip'}
-        </button>
+        <button className="primary-btn trips-add-btn" type="button" onClick={() => setShowCreate((value) => !value)}>{showCreate ? 'Cancel' : '+ Add trip'}</button>
       </div>
-      <div className="trips-title">
-        <p className="auth-eyebrow">Family Atlas</p>
-        <h1>Trips</h1>
-        <p>Keep the journeys that make up your travel life — family holidays, solo trips and everything in between.</p>
-      </div>
-
+      <div className="trips-title"><p className="auth-eyebrow">Family Atlas</p><h1>Trips</h1><p>Keep the journeys that make up your travel life — family holidays, solo trips and everything in between.</p></div>
       {error && <p className="auth-error trip-error" role="alert">{error}</p>}
-
       {showCreate && (
         <form className="trip-form" onSubmit={handleCreate}>
           <h2>Add a trip</h2>
           <label>Trip name<input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. French Riviera 2026" required /></label>
-          <div className="trip-form-row">
-            <label>Start date <span>(optional)</span><input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></label>
-            <label>End date <span>(optional)</span><input type="date" value={endDate} min={startDate || undefined} onChange={(event) => setEndDate(event.target.value)} /></label>
-          </div>
-
-          <fieldset className="trip-fieldset">
-            <legend>Who went?</legend>
-            <p className="trip-form-help">You are included automatically. Add people from your Family Atlas or anyone else who travelled.</p>
-            <div className="participant-picker">
-              {personProfiles.map((profile) => (
-                <label key={profile.id}>
-                  <input type="checkbox" checked={participantIds.includes(profile.personId!)} onChange={() => toggleParticipant(profile.personId!)} />
-                  {profile.name}
-                </label>
-              ))}
-              {guestPeople.map((person) => (
-                <label key={person.id}>
-                  <input type="checkbox" checked={participantIds.includes(person.id)} onChange={() => toggleParticipant(person.id)} />
-                  {person.displayName}
-                </label>
-              ))}
-            </div>
-            <div className="country-adder" aria-label="Add someone outside your Family Atlas">
-              <input
-                value={guestName}
-                onChange={(event) => setGuestName(event.target.value)}
-                placeholder="Add someone else, e.g. Grandad"
-                aria-label="Name of another person"
-              />
-              <button className="secondary-btn" type="button" onClick={handleAddGuest} disabled={!guestName.trim() || addingGuest}>
-                {addingGuest ? 'Adding…' : '+ Add person'}
-              </button>
-            </div>
-            <p className="trip-form-help">They do not need a Family Atlas account. Once added, you can reuse them on future trips.</p>
-          </fieldset>
-
-          <fieldset className="trip-fieldset">
-            <legend>Countries</legend>
-            <div className="country-adder">
-              <select value={countryToAdd} onChange={(event) => setCountryToAdd(event.target.value)}>
-                <option value="">Choose a country</option>
-                {countryList.filter((country) => !countryIds.includes(country.id)).map((country) => (
-                  <option key={country.id} value={country.id}>{country.name}</option>
-                ))}
-              </select>
-              <button className="secondary-btn" type="button" onClick={addCountry} disabled={!countryToAdd}>Add</button>
-            </div>
-            {countryIds.length > 0 && <div className="trip-tags">{countryIds.map((id) => <button type="button" key={id} onClick={() => setCountryIds((current) => current.filter((item) => item !== id))}>{countryNames.get(id) || id} ×</button>)}</div>}
-          </fieldset>
-
+          <div className="trip-form-row"><label>Start date <span>(optional)</span><input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></label><label>End date <span>(optional)</span><input type="date" value={endDate} min={startDate || undefined} onChange={(event) => setEndDate(event.target.value)} /></label></div>
+          <fieldset className="trip-fieldset"><legend>Who went?</legend><p className="trip-form-help">You are included automatically. Add people from your Family Atlas or anyone else who travelled.</p><div className="participant-picker">{personProfiles.map((profile) => <label key={profile.id}><input type="checkbox" checked={participantIds.includes(profile.personId!)} onChange={() => toggleParticipant(profile.personId!)} />{profile.name}</label>)}{guestPeople.map((person) => <label key={person.id}><input type="checkbox" checked={participantIds.includes(person.id)} onChange={() => toggleParticipant(person.id)} />{person.displayName}</label>)}</div><div className="country-adder" aria-label="Add someone outside your Family Atlas"><input value={guestName} onChange={(event) => setGuestName(event.target.value)} placeholder="Add someone else, e.g. Grandad" aria-label="Name of another person" /><button className="secondary-btn" type="button" onClick={handleAddGuest} disabled={!guestName.trim() || addingGuest}>{addingGuest ? 'Adding…' : '+ Add person'}</button></div><p className="trip-form-help">They do not need a Family Atlas account. Once added, you can reuse them on future trips.</p></fieldset>
+          <fieldset className="trip-fieldset"><legend>Countries</legend><div className="country-adder"><select value={countryToAdd} onChange={(event) => setCountryToAdd(event.target.value)}><option value="">Choose a country</option>{countryList.filter((country) => !countryIds.includes(country.id)).map((country) => <option key={country.id} value={country.id}>{country.name}</option>)}</select><button className="secondary-btn" type="button" onClick={addCountry} disabled={!countryToAdd}>Add</button></div>{countryIds.length > 0 && <div className="trip-tags">{countryIds.map((id) => <button type="button" key={id} onClick={() => setCountryIds((current) => current.filter((item) => item !== id))}>{countryNames.get(id) || id} ×</button>)}</div>}</fieldset>
           <label>Description <span>(optional)</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} placeholder="A few words about the trip..." /></label>
-          <label>Who can see it?
-            <select value={visibility} onChange={(event) => setVisibility(event.target.value as 'atlas' | 'private')}>
-              <option value="atlas">My Family Atlas</option>
-              <option value="private">Only me</option>
-            </select>
-          </label>
+          <label>Who can see it?<select value={visibility} onChange={(event) => setVisibility(event.target.value as 'atlas' | 'private')}><option value="atlas">My Family Atlas</option><option value="private">Only me</option></select></label>
           <button className="primary-btn" type="submit" disabled={saving}>{saving ? 'Saving trip…' : 'Save trip'}</button>
         </form>
       )}
-
-      {loading ? (
-        <p className="trips-empty">Loading trips…</p>
-      ) : trips.length === 0 ? (
-        <section className="trips-empty-card">
-          <h2>Your travel story starts here</h2>
-          <p>Add a recent holiday or a trip from years ago. You can add more detail later.</p>
-          {!showCreate && <button className="primary-btn" type="button" onClick={() => setShowCreate(true)}>+ Add your first trip</button>}
-        </section>
-      ) : (
-        <section className="trip-grid" aria-label="Trips">
-          {trips.map((trip) => (
-            <button className="trip-card" key={trip.id} type="button" onClick={() => setSelectedTripId(trip.id)}>
-              <span className="trip-card-label">{trip.visibility === 'private' ? 'Private trip' : 'Family trip'}</span>
-              <strong>{trip.title}</strong>
-              <span>{tripDateLabel(trip)}</span>
-              {trip.countryIds.length > 0 && <span>{trip.countryIds.map((id) => countryNames.get(id) || id).join(' · ')}</span>}
-              <span className="trip-card-people">{trip.participantNames.join(', ')}</span>
-            </button>
-          ))}
-        </section>
-      )}
+      {loading ? <p className="trips-empty">Loading trips…</p> : trips.length === 0 ? <section className="trips-empty-card"><h2>Your travel story starts here</h2><p>Add a recent holiday or a trip from years ago. You can add more detail later.</p>{!showCreate && <button className="primary-btn" type="button" onClick={() => setShowCreate(true)}>+ Add your first trip</button>}</section> : <section className="trip-grid" aria-label="Trips">{trips.map((trip) => <button className="trip-card" key={trip.id} type="button" onClick={() => setSelectedTripId(trip.id)}><span className="trip-card-label">{trip.visibility === 'private' ? 'Private trip' : 'Family trip'}</span><strong>{trip.title}</strong><span>{tripDateLabel(trip)}</span>{trip.countryIds.length > 0 && <span>{trip.countryIds.map((id) => countryNames.get(id) || id).join(' · ')}</span>}<span className="trip-card-people">{trip.participantNames.join(', ')}</span></button>)}</section>}
     </main>
   )
 }
