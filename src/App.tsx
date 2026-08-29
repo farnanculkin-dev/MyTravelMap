@@ -5,6 +5,7 @@ import AtlasSetupScreen from './components/AtlasSetupScreen'
 import MemberInvitePanel from './components/MemberInvitePanel'
 import HomeProfiles from './components/HomeProfiles'
 import MapView from './components/MapView'
+import ProfileTripsPanel from './components/ProfileTripsPanel'
 import TripsScreen from './components/TripsScreen'
 import { LocalStorageTravelRepository } from './lib/LocalStorageTravelRepository'
 import { TravelRepository } from './lib/TravelRepository'
@@ -169,20 +170,27 @@ export default function App() {
       ) : !profile ? (
         <HomeProfiles profiles={activeProfiles} onSelect={handleSelectProfile} onTrips={handleOpenTrips} groupImage={cloudData?.groupImage} profileImages={cloudData?.profileImages} onUploadImage={cloudData ? uploadImage : undefined} />
       ) : (
-        <MapView
-          profile={profile}
-          profileName={activeProfile?.name}
-          defaultMapColor={activeProfile?.mapColour}
-          onBack={handleBack}
-          travelRepo={travelRepo}
-          cloudVisited={cloudData?.visitedByProfile[profile]}
-          cloudMapColor={activeProfile?.mapColour}
-          onSaveVisited={cloudData ? (visited) => saveCloudVisited(profile, visited) : undefined}
-          onSaveMapColor={cloudData ? async (color) => {
-            await saveCloudMapColour(profile, color)
-            setCloudData((current) => current ? { ...current, profiles: current.profiles.map((item) => item.id === profile ? { ...item, mapColour: color } : item) } : current)
-          } : undefined}
-        />
+        <>
+          <MapView
+            profile={profile}
+            profileName={activeProfile?.name}
+            defaultMapColor={activeProfile?.mapColour}
+            onBack={handleBack}
+            travelRepo={travelRepo}
+            cloudVisited={cloudData?.visitedByProfile[profile]}
+            cloudMapColor={activeProfile?.mapColour}
+            onSaveVisited={cloudData ? (visited) => saveCloudVisited(profile, visited) : undefined}
+            onSaveMapColor={cloudData ? async (color) => {
+              await saveCloudMapColour(profile, color)
+              setCloudData((current) => current ? { ...current, profiles: current.profiles.map((item) => item.id === profile ? { ...item, mapColour: color } : item) } : current)
+            } : undefined}
+          />
+          <ProfileTripsPanel
+            atlasId={membership.atlasId}
+            personId={activeProfile?.personId}
+            personName={activeProfile?.name || 'Traveller'}
+          />
+        </>
       )}
     </div>
   )
