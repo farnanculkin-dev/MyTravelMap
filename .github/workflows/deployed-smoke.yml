@@ -1,0 +1,39 @@
+name: Family Atlas Deployed Smoke
+
+on:
+  deployment_status:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.deployment_status.state == 'success' && github.event.deployment.ref == 'develop')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout develop
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install application dependencies
+        run: npm ci
+
+      - name: Install pinned Playwright runner
+        run: npm install --no-save --package-lock=false playwright@1.55.0
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run smoke test against develop
+        env:
+          FAMILY_ATLAS_BASE_URL: https://my-travel-map-git-develop-farnanculkin-devs-projects.vercel.app
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: node scripts/deployed-smoke.mjs
