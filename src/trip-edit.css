@@ -1,0 +1,6 @@
+.trip-header-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.trip-form-actions{display:flex;gap:10px;justify-content:flex-end;align-items:center}
+.trip-cover-photo{display:block;width:100%;max-height:360px;aspect-ratio:16/8;object-fit:cover;border-radius:10px;margin:0 0 20px}
+.trip-card-cover{width:calc(100% + 36px);height:150px;object-fit:cover;margin:-18px -18px 8px;border-radius:11px 11px 0 0;display:block}
+.trip-card:has(.trip-card-cover){overflow:hidden}
+@media (max-width:520px){.trip-header-actions{gap:7px}.trip-form-actions{display:grid;grid-template-columns:1fr 1fr}.trip-form-actions button{width:100%}.trip-cover-photo{max-height:240px}.trip-card-cover{height:130px}}
