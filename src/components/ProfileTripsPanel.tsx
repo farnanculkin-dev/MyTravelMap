@@ -13,11 +13,10 @@ function tripDateLabel(trip: Trip): string {
   return 'Date not added yet'
 }
 
-export default function ProfileTripsPanel({ atlasId, personId, personName, onOpenTrip }: {
+export default function ProfileTripsPanel({ atlasId, personId, personName }: {
   atlasId: string
   personId?: string
   personName: string
-  onOpenTrip: (tripId: string) => void
 }) {
   const [trips, setTrips] = useState<Trip[]>([])
   const [loading, setLoading] = useState(true)
@@ -39,6 +38,10 @@ export default function ProfileTripsPanel({ atlasId, personId, personName, onOpe
     return trips.filter((trip) => trip.ownerPersonId === personId || trip.participantIds.includes(personId))
   }, [personId, trips])
 
+  function openTrip(tripId: string) {
+    window.location.assign(`${window.location.pathname}?trip=${encodeURIComponent(tripId)}`)
+  }
+
   return (
     <section className="profile-trips-panel" aria-label={`${personName}'s trips`}>
       <div className="trips-title">
@@ -46,27 +49,13 @@ export default function ProfileTripsPanel({ atlasId, personId, personName, onOpe
         <h2>{personName}’s Trips</h2>
         <p>Trips that {personName} took part in appear here, whether they were family holidays, solo journeys or trips with other people.</p>
       </div>
-
       {error && <p className="auth-error trip-error" role="alert">{error}</p>}
-      {loading ? (
-        <p className="trips-empty">Loading trips…</p>
-      ) : !personId ? (
-        <p className="trips-empty">This profile is not linked to a Person identity yet.</p>
-      ) : profileTrips.length === 0 ? (
-        <section className="trips-empty-card">
-          <h3>No trips recorded yet</h3>
-          <p>Trips will appear here automatically when {personName} is included as a participant.</p>
-        </section>
+      {loading ? <p className="trips-empty">Loading trips…</p> : !personId ? <p className="trips-empty">This profile is not linked to a Person identity yet.</p> : profileTrips.length === 0 ? (
+        <section className="trips-empty-card"><h3>No trips recorded yet</h3><p>Trips will appear here automatically when {personName} is included as a participant.</p></section>
       ) : (
         <section className="trip-grid" aria-label={`${personName}'s trip list`}>
           {profileTrips.map((trip) => (
-            <button
-              className="trip-card"
-              key={trip.id}
-              type="button"
-              onClick={() => onOpenTrip(trip.id)}
-              aria-label={`Open ${trip.title}`}
-            >
+            <button className="trip-card" key={trip.id} type="button" onClick={() => openTrip(trip.id)} aria-label={`Open ${trip.title}`}>
               <span className="trip-card-label">{trip.visibility === 'private' ? 'Private trip' : 'Family trip'}</span>
               <strong>{trip.title}</strong>
               <span>{tripDateLabel(trip)}</span>
