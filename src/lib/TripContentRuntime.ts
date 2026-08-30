@@ -54,6 +54,15 @@ export async function uploadTripPhoto(input:{atlasId:string;tripId:string;dataUr
   if(error) throw new Error(`Could not save trip photo: ${error.message}`)
 }
 
+export async function uploadTripCoverPhoto(input:{atlasId:string;tripId:string;dataUrl:string}) {
+  const {blob,mime,ext}=dataUrlToBlob(input.dataUrl)
+  const path=`${input.atlasId}/trips/${input.tripId}/cover.${ext}`
+  const {error:uploadError}=await supabase.storage.from('atlas-media').upload(path,blob,{contentType:mime,upsert:true})
+  if(uploadError) throw new Error(`Could not upload trip cover photo: ${uploadError.message}`)
+  const {error:updateError}=await supabase.from('trips').update({cover_photo_path:path}).eq('id',input.tripId)
+  if(updateError) throw new Error(`Could not save trip cover photo: ${updateError.message}`)
+}
+
 export async function uploadMemoryPhoto(input:{atlasId:string;tripId:string;memoryId:string;dataUrl:string}) {
   const {blob,mime,ext}=dataUrlToBlob(input.dataUrl); const path=`${input.atlasId}/trips/${input.tripId}/memories/${input.memoryId}.${ext}`
   const {error:ue}=await supabase.storage.from('atlas-media').upload(path,blob,{contentType:mime,upsert:true})
