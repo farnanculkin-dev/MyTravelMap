@@ -1,0 +1,14 @@
+.trip-content-grid{display:grid;gap:22px;min-width:0}
+.trip-content-grid>div{min-width:0}
+.trip-photo-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px;min-width:0}
+.trip-photo-grid figure{margin:0;min-width:0;overflow:hidden;border-radius:8px;background:#fff;border:1px solid #d1e7e5}
+.trip-photo-grid img{display:block;width:100%;height:190px;max-width:100%;object-fit:cover}
+.trip-photo-grid figcaption{padding:7px 9px;font-size:13px;color:#536867}
+.trip-memory-photo{display:block;width:100%;max-width:360px;height:220px;object-fit:cover;border-radius:8px;margin:0 0 10px}
+.trip-card-link{margin-top:5px!important;color:#174f52!important;font-weight:700;font-size:13px}
+.trip-next-section img{box-sizing:border-box}
+@media (max-width:620px){
+  .trip-photo-grid{grid-template-columns:1fr}
+  .trip-photo-grid img{height:auto;max-height:280px}
+  .trip-memory-photo{max-width:100%;height:auto;max-height:280px}
+}

@@ -26,7 +26,7 @@ export default function TripsScreen({ atlasId, profiles, onBack }: {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
-  const [selectedTripId, setSelectedTripId] = useState<string | null>(null)
+  const [selectedTripId, setSelectedTripId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('trip'))
   const [saving, setSaving] = useState(false)
   const [title, setTitle] = useState('')
   const [startDate, setStartDate] = useState('')
@@ -118,7 +118,7 @@ export default function TripsScreen({ atlasId, profiles, onBack }: {
     return (
       <main className="trips-screen">
         <div className="trips-header">
-          <button className="back-btn" type="button" onClick={() => setSelectedTripId(null)}>← Trips</button>
+          <button className="back-btn" type="button" onClick={() => { setSelectedTripId(null); window.history.replaceState({}, '', window.location.pathname) }}>← Trips</button>
           <span className="trip-visibility">{selectedTrip.visibility === 'private' ? 'Private' : 'Family Atlas'}</span>
         </div>
         <article className="trip-detail">
