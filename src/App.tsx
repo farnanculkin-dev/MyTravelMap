@@ -35,7 +35,7 @@ export default function App() {
   const [cloudLoading, setCloudLoading] = useState(false)
   const [cloudError, setCloudError] = useState<string | null>(null)
   const [profile, setProfile] = useState<string | null>(null)
-  const [section, setSection] = useState<AppSection>('home')
+  const [section, setSection] = useState<AppSection>(() => new URLSearchParams(window.location.search).has('trip') ? 'trips' : 'home')
   const activeProfiles = cloudData?.profiles || fallbackProfiles
 
   useEffect(() => {
@@ -99,7 +99,8 @@ export default function App() {
   }, [membership])
 
   useEffect(() => {
-    const urlProfile = new URLSearchParams(window.location.search).get('profile')
+    const params = new URLSearchParams(window.location.search)
+    const urlProfile = params.get('profile')
     if (urlProfile) setProfile(urlProfile)
   }, [])
 
@@ -185,11 +186,7 @@ export default function App() {
               setCloudData((current) => current ? { ...current, profiles: current.profiles.map((item) => item.id === profile ? { ...item, mapColour: color } : item) } : current)
             } : undefined}
           />
-          <ProfileTripsPanel
-            atlasId={membership.atlasId}
-            personId={activeProfile?.personId}
-            personName={activeProfile?.name || 'Traveller'}
-          />
+          <ProfileTripsPanel atlasId={membership.atlasId} personId={activeProfile?.personId} personName={activeProfile?.name || 'Traveller'} />
         </>
       )}
     </div>
