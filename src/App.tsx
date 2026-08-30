@@ -126,6 +126,11 @@ export default function App() {
     setSection('trips')
     window.history.replaceState({}, '', window.location.pathname)
   }
+  const handleOpenTrip = (tripId: string) => {
+    setProfile(null)
+    window.history.replaceState({}, '', `${window.location.pathname}?trip=${encodeURIComponent(tripId)}`)
+    setSection('trips')
+  }
   const handleSignOut = async () => {
     setProfile(null)
     setSection('home')
@@ -186,7 +191,7 @@ export default function App() {
               setCloudData((current) => current ? { ...current, profiles: current.profiles.map((item) => item.id === profile ? { ...item, mapColour: color } : item) } : current)
             } : undefined}
           />
-          <ProfileTripsPanel atlasId={membership.atlasId} personId={activeProfile?.personId} personName={activeProfile?.name || 'Traveller'} />
+          <ProfileTripsPanel atlasId={membership.atlasId} personId={activeProfile?.personId} personName={activeProfile?.name || 'Traveller'} onOpenTrip={handleOpenTrip} />
         </>
       )}
     </div>
