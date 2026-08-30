@@ -13,15 +13,15 @@ function tripDateLabel(trip: Trip): string {
   return 'Date not added yet'
 }
 
-export default function ProfileTripsPanel({ atlasId, personId, personName }: {
+export default function ProfileTripsPanel({ atlasId, personId, personName, onOpenTrip }: {
   atlasId: string
   personId?: string
   personName: string
+  onOpenTrip: (tripId: string) => void
 }) {
   const [trips, setTrips] = useState<Trip[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedTripId, setSelectedTripId] = useState<string | null>(null)
 
   useEffect(() => {
     let mounted = true
@@ -38,8 +38,6 @@ export default function ProfileTripsPanel({ atlasId, personId, personName }: {
     if (!personId) return []
     return trips.filter((trip) => trip.ownerPersonId === personId || trip.participantIds.includes(personId))
   }, [personId, trips])
-
-  const selectedTrip = profileTrips.find((trip) => trip.id === selectedTripId) || null
 
   return (
     <section className="profile-trips-panel" aria-label={`${personName}'s trips`}>
@@ -60,47 +58,24 @@ export default function ProfileTripsPanel({ atlasId, personId, personName }: {
           <p>Trips will appear here automatically when {personName} is included as a participant.</p>
         </section>
       ) : (
-        <>
-          <section className="trip-grid" aria-label={`${personName}'s trip list`}>
-            {profileTrips.map((trip) => (
-              <button
-                className="trip-card"
-                key={trip.id}
-                type="button"
-                onClick={() => setSelectedTripId((current) => current === trip.id ? null : trip.id)}
-              >
-                <span className="trip-card-label">{trip.visibility === 'private' ? 'Private trip' : 'Family trip'}</span>
-                <strong>{trip.title}</strong>
-                <span>{tripDateLabel(trip)}</span>
-                {trip.countryIds.length > 0 && <span>{trip.countryIds.map((id) => countryNames.get(id) || id).join(' · ')}</span>}
-                <span className="trip-card-people">{trip.participantNames.join(', ')}</span>
-              </button>
-            ))}
-          </section>
-
-          {selectedTrip && (
-            <article className="trip-detail">
-              <p className="auth-eyebrow">Trip</p>
-              <h2>{selectedTrip.title}</h2>
-              <p className="trip-dates">{tripDateLabel(selectedTrip)}</p>
-              {selectedTrip.countryIds.length > 0 && (
-                <div className="trip-tags" aria-label="Countries">
-                  {selectedTrip.countryIds.map((id) => <span key={id}>{countryNames.get(id) || id}</span>)}
-                </div>
-              )}
-              <section className="trip-detail-section">
-                <h3>Who went?</h3>
-                <p>{selectedTrip.participantNames.join(', ') || 'Participants can be added later.'}</p>
-              </section>
-              {selectedTrip.description && (
-                <section className="trip-detail-section">
-                  <h3>About this trip</h3>
-                  <p>{selectedTrip.description}</p>
-                </section>
-              )}
-            </article>
-          )}
-        </>
+        <section className="trip-grid" aria-label={`${personName}'s trip list`}>
+          {profileTrips.map((trip) => (
+            <button
+              className="trip-card"
+              key={trip.id}
+              type="button"
+              onClick={() => onOpenTrip(trip.id)}
+              aria-label={`Open ${trip.title}`}
+            >
+              <span className="trip-card-label">{trip.visibility === 'private' ? 'Private trip' : 'Family trip'}</span>
+              <strong>{trip.title}</strong>
+              <span>{tripDateLabel(trip)}</span>
+              {trip.countryIds.length > 0 && <span>{trip.countryIds.map((id) => countryNames.get(id) || id).join(' · ')}</span>}
+              <span className="trip-card-people">{trip.participantNames.join(', ')}</span>
+              <span className="trip-card-link">Open trip →</span>
+            </button>
+          ))}
+        </section>
       )}
     </section>
   )
