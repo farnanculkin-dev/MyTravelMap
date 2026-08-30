@@ -40,6 +40,7 @@ export interface Trip {
   startDate?: string
   endDate?: string
   description?: string
+  coverPhotoUrl?: string
   visibility: 'atlas' | 'private'
   participantIds: string[]
   participantNames: string[]
