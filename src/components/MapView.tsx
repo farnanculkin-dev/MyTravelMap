@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { TravelRepository } from '../lib/TravelRepository'
+import { loadPersonMapPlaces, type PersonMapPlace } from '../lib/TripContentRuntime'
 import countries from '../data/countries.json'
 import { feature } from 'topojson-client'
 import * as d3 from 'd3-geo'
@@ -56,9 +57,11 @@ function simplifyGeometry(geometry: any, tolerance: number): any {
 
 export default function MapView({
   profile,
+  personId,
   profileName,
   defaultMapColor,
   onBack,
+  onOpenPlace,
   travelRepo,
   cloudVisited,
   cloudMapColor,
@@ -66,9 +69,11 @@ export default function MapView({
   onSaveMapColor,
 }: {
   profile: string
+  personId?: string
   profileName?: string
   defaultMapColor?: string
   onBack: () => void
+  onOpenPlace?: (tripId:string, placeId:string) => void
   travelRepo: TravelRepository
   cloudVisited?: string[]
   cloudMapColor?: string
@@ -82,12 +87,22 @@ export default function MapView({
   const [contextFeatures, setContextFeatures] = useState<any[]>([])
   const [missing, setMissing] = useState<string[]>([])
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [placeMarkers,setPlaceMarkers]=useState<PersonMapPlace[]>([])
+  const [markerError,setMarkerError]=useState<string|null>(null)
 
   useEffect(() => {
     const v = new Set(cloudVisited || travelRepo.getVisited(profile))
     setVisited(v)
     setMapColor(cloudMapColor || travelRepo.getMapColor(profile) || defaultMapColor || MAP_COLORS[0].value)
   }, [cloudMapColor, cloudVisited, defaultMapColor, profile, travelRepo])
+
+  useEffect(()=>{
+    if(!personId){setPlaceMarkers([]);return}
+    let cancelled=false
+    setMarkerError(null)
+    loadPersonMapPlaces(personId).then((rows)=>{if(!cancelled)setPlaceMarkers(rows)}).catch((error)=>{if(!cancelled)setMarkerError(error instanceof Error?error.message:'Places could not be loaded.')})
+    return()=>{cancelled=true}
+  },[personId])
 
   useEffect(() => {
     let cancelled = false
@@ -163,8 +178,6 @@ export default function MapView({
     }
   }
 
-  // Keep the Milestone 1 view fixed to Europe and nearby North Africa.
-  // Enlarged by ~30% to make Europe occupy substantially more of the map panel.
   const projection = d3.geoMercator().center([10, 50]).scale(650).translate([500, 520])
   const pathGen = d3.geoPath().projection(projection as any)
 
@@ -189,8 +202,9 @@ export default function MapView({
             />
           ))}
         </div>
-        <div className="visited-count">Countries visited: {visited.size}</div>
+        <div className="visited-count">Countries visited: {visited.size}{placeMarkers.length>0?` · Places: ${placeMarkers.length}`:''}</div>
         {saveError && <div className="save-error" role="alert">{saveError}</div>}
+        {markerError && <div className="save-error" role="alert">{markerError}</div>}
       </header>
 
       <div className="map-workspace">
@@ -249,8 +263,18 @@ export default function MapView({
                   aria-hidden="true"
                 />
               )}
+              {placeMarkers.map((place)=>{
+                if(typeof place.latitude!=='number'||typeof place.longitude!=='number')return null
+                const point=projection([place.longitude,place.latitude])
+                if(!point)return null
+                return <g key={place.id} className="place-marker" role="button" tabIndex={0} aria-label={`${place.name}, ${place.tripTitle}`} onClick={()=>onOpenPlace?.(place.tripId,place.id)} onKeyDown={(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();onOpenPlace?.(place.tripId,place.id)}}} style={{cursor:onOpenPlace?'pointer':'default'}}>
+                  <circle cx={point[0]} cy={point[1]} r={6.5} fill="#111" stroke="#fff" strokeWidth={2}/>
+                  <title>{`${place.name} · ${place.tripTitle}`}</title>
+                </g>
+              })}
             </g>
           </svg>
+          {placeMarkers.length>0&&<p className="map-place-help">● Place markers show cities and places from this person’s trips. Tap or click a dot to open that place.</p>}
         </div>
 
         <aside className="country-checklist" aria-label="Country checklist">
