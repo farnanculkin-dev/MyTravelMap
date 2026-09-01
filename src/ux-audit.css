@@ -6,7 +6,7 @@
 .app-nav-link:hover{background:#fff}.app-nav-link.active{background:#2f897d;color:#fff}
 .app-account{display:flex;align-items:center;gap:10px;color:#315e59;font-size:.86rem}.app-account-email{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .home,.trips-screen,.settings-screen{width:100%;max-width:none;box-sizing:border-box}
-.home{padding-left:8px;padding-right:8px}.home-title-row{max-width:100%}.group-photo-section{max-width:900px}.profiles{max-width:100%;margin-left:auto;margin-right:auto}
+.home{padding-left:8px;padding-right:8px}.home-title-row{max-width:100%}.group-photo-section{width:100%;max-width:none}.profiles{width:100%;max-width:none;margin-left:auto;margin-right:auto}
 .trips-screen{padding-left:8px;padding-right:8px}.trip-grid{width:100%}
 .settings-screen{margin:0 auto;padding:42px 8px 80px}.settings-title{max-width:720px;margin-bottom:28px}.settings-title h1{font-size:clamp(2rem,5vw,3.5rem);margin:.25rem 0}.settings-card{background:#fff;border:1px solid #c9dfdc;border-radius:16px;padding:24px}
 .settings-explainer{margin-top:18px;padding-top:16px;border-top:1px solid #e4dba9;color:#4b4634}.settings-explainer p{margin:6px 0 0;line-height:1.5}
