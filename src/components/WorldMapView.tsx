@@ -17,6 +17,7 @@ export type WorldRegion = 'world' | 'americas' | 'asia' | 'africa' | 'oceania'
 
 type Transform = { x: number; y: number; k: number }
 type CountryMeta = { id: string; name: string; feature: any; region: string }
+type DragState = { pointerId: number; x: number; y: number; tx: number; ty: number; moved: boolean }
 
 const VIEWBOX_W = 960
 const VIEWBOX_H = 560
@@ -36,10 +37,29 @@ const EUROPE_ALIASES: Record<string, string> = {
   'macedonia': 'MK',
 }
 
+// Explicit grouping prevents centroid-based mistakes around Europe, the Caucasus and the Middle East.
+const EUROPE_NAMES = new Set([
+  'albania', 'andorra', 'armenia', 'austria', 'azerbaijan', 'belarus', 'belgium',
+  'bosnia and herzegovina', 'bulgaria', 'croatia', 'cyprus', 'czech republic', 'czechia',
+  'denmark', 'estonia', 'faroe islands', 'finland', 'france', 'georgia', 'germany', 'greece',
+  'hungary', 'iceland', 'ireland', 'italy', 'kosovo', 'latvia', 'liechtenstein', 'lithuania',
+  'luxembourg', 'malta', 'moldova', 'monaco', 'montenegro', 'netherlands', 'north macedonia',
+  'norway', 'poland', 'portugal', 'romania', 'russia', 'russian federation', 'san marino',
+  'serbia', 'slovakia', 'slovenia', 'spain', 'sweden', 'switzerland', 'turkey', 'türkiye',
+  'ukraine', 'united kingdom', 'vatican', 'vatican city',
+])
+
+const MIDDLE_EAST_ASIA_NAMES = new Set([
+  'bahrain', 'iran', 'iraq', 'israel', 'jordan', 'kuwait', 'lebanon', 'oman', 'palestine',
+  'qatar', 'saudi arabia', 'syria', 'united arab emirates', 'yemen',
+])
+
 function getRegion(name: string, centroid: [number, number]) {
   const [lon, lat] = centroid
   const n = normalizeName(name)
-  if (n === 'greenland') return 'Americas'
+  if (n === 'french guiana' || n === 'greenland') return 'Americas'
+  if (EUROPE_NAMES.has(n)) return 'Europe'
+  if (MIDDLE_EAST_ASIA_NAMES.has(n)) return 'Asia'
   if (n === 'indonesia' || n === 'timor leste') return 'Asia'
   if (n === 'papua new guinea') return 'Australia & Pacific'
   if (lon < -25) return 'Americas'
@@ -91,7 +111,9 @@ export default function WorldMapView({
   const [placeBusy, setPlaceBusy] = useState(false)
   const [markerError, setMarkerError] = useState<string | null>(null)
   const [transform, setTransform] = useState<Transform>({ x: 0, y: 0, k: 1 })
-  const dragRef = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null)
+  const svgRef = useRef<SVGSVGElement | null>(null)
+  const dragRef = useRef<DragState | null>(null)
+  const didDragRef = useRef(false)
 
   const projection = useMemo(() => d3.geoNaturalEarth1().fitExtent([[12, 12], [VIEWBOX_W - 12, VIEWBOX_H - 12]], { type: 'Sphere' } as any), [])
   const pathGen = useMemo(() => d3.geoPath().projection(projection as any), [projection])
@@ -238,32 +260,70 @@ export default function WorldMapView({
     setTransform({ x: VIEWBOX_W / 2 - point[0] * preset.k, y: VIEWBOX_H / 2 - point[1] * preset.k, k: preset.k })
   }, [projection, region])
 
-  function handleWheel(event: React.WheelEvent<SVGSVGElement>) {
-    event.preventDefault()
-    const rect = event.currentTarget.getBoundingClientRect()
-    const px = (event.clientX - rect.left) * VIEWBOX_W / rect.width
-    const py = (event.clientY - rect.top) * VIEWBOX_H / rect.height
-    const factor = event.deltaY < 0 ? 1.2 : 1 / 1.2
-    const nextK = Math.max(1, Math.min(12, transform.k * factor))
-    const worldX = (px - transform.x) / transform.k
-    const worldY = (py - transform.y) / transform.k
-    setTransform({ k: nextK, x: px - worldX * nextK, y: py - worldY * nextK })
-  }
+  // React's delegated wheel event can be passive in the browser. A native non-passive listener
+  // guarantees that zooming the map does not also scroll the page.
+  useEffect(() => {
+    const svg = svgRef.current
+    if (!svg) return
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault()
+      event.stopPropagation()
+      const rect = svg.getBoundingClientRect()
+      if (!rect.width || !rect.height) return
+      const px = (event.clientX - rect.left) * VIEWBOX_W / rect.width
+      const py = (event.clientY - rect.top) * VIEWBOX_H / rect.height
+      const factor = event.deltaY < 0 ? 1.2 : 1 / 1.2
+      setTransform((current) => {
+        const nextK = Math.max(1, Math.min(12, current.k * factor))
+        const worldX = (px - current.x) / current.k
+        const worldY = (py - current.y) / current.k
+        return { k: nextK, x: px - worldX * nextK, y: py - worldY * nextK }
+      })
+    }
+    svg.addEventListener('wheel', handleWheel, { passive: false })
+    return () => svg.removeEventListener('wheel', handleWheel)
+  }, [])
 
   function handlePointerDown(event: React.PointerEvent<SVGSVGElement>) {
-    event.currentTarget.setPointerCapture(event.pointerId)
-    dragRef.current = { x: event.clientX, y: event.clientY, tx: transform.x, ty: transform.y }
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+    event.preventDefault()
+    didDragRef.current = false
+    dragRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, tx: transform.x, ty: transform.y, moved: false }
+    try { event.currentTarget.setPointerCapture(event.pointerId) } catch { /* capture may fail if the pointer ended early */ }
   }
 
   function handlePointerMove(event: React.PointerEvent<SVGSVGElement>) {
-    if (!dragRef.current) return
+    const drag = dragRef.current
+    if (!drag || drag.pointerId !== event.pointerId) return
     const rect = event.currentTarget.getBoundingClientRect()
-    const dx = (event.clientX - dragRef.current.x) * VIEWBOX_W / rect.width
-    const dy = (event.clientY - dragRef.current.y) * VIEWBOX_H / rect.height
-    setTransform((current) => ({ ...current, x: dragRef.current!.tx + dx, y: dragRef.current!.ty + dy }))
+    if (!rect.width || !rect.height) return
+    const dxPixels = event.clientX - drag.x
+    const dyPixels = event.clientY - drag.y
+    if (!drag.moved && Math.hypot(dxPixels, dyPixels) > 3) {
+      drag.moved = true
+      didDragRef.current = true
+    }
+    const dx = dxPixels * VIEWBOX_W / rect.width
+    const dy = dyPixels * VIEWBOX_H / rect.height
+    setTransform((current) => ({ ...current, x: drag.tx + dx, y: drag.ty + dy }))
   }
 
-  function stopDrag() { dragRef.current = null }
+  function stopDrag(event: React.PointerEvent<SVGSVGElement>) {
+    const drag = dragRef.current
+    if (drag?.pointerId === event.pointerId) {
+      try {
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+      } catch { /* safe cleanup */ }
+      dragRef.current = null
+      window.setTimeout(() => { didDragRef.current = false }, 0)
+    }
+  }
+
+  function handleCountryClick(event: React.MouseEvent, country: CountryMeta) {
+    event.stopPropagation()
+    if (didDragRef.current) return
+    void toggleCountry(country)
+  }
 
   return <div className="map-view world-map-view">
     <header className="map-header">
@@ -279,13 +339,13 @@ export default function WorldMapView({
     <div className="map-workspace world-map-workspace">
       <div className="map-container world-map-container">
         <div className="world-map-zoom-hint">Scroll/pinch to zoom · drag to move · use the region buttons above for a quick jump</div>
-        <svg viewBox={`0 0 ${VIEWBOX_W} ${VIEWBOX_H}`} className="svg-map world-svg-map" role="img" aria-label="Interactive world travel map" onWheel={handleWheel} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={stopDrag} onPointerCancel={stopDrag}>
+        <svg ref={svgRef} viewBox={`0 0 ${VIEWBOX_W} ${VIEWBOX_H}`} className="svg-map world-svg-map" role="img" aria-label="Interactive world travel map" onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={stopDrag} onPointerCancel={stopDrag}>
           <rect width={VIEWBOX_W} height={VIEWBOX_H} fill="#f8fcfb" />
           <g transform={`translate(${transform.x} ${transform.y}) scale(${transform.k})`}>
             {features.map((item) => {
               const meta = countryByFeatureId.get(item.id)
               if (!meta || normalizeName(meta.name) === 'antarctica') return null
-              return <path key={item.id} d={pathGen(item as any) || undefined} fill={isVisited(meta) ? mapColor : '#fff'} stroke="#3e5452" strokeWidth={0.55 / transform.k} vectorEffect="non-scaling-stroke" onClick={(event) => { event.stopPropagation(); void toggleCountry(meta) }} style={{ cursor: 'pointer' }}><title>{meta.name}</title></path>
+              return <path key={item.id} d={pathGen(item as any) || undefined} fill={isVisited(meta) ? mapColor : '#fff'} stroke="#3e5452" strokeWidth={0.55 / transform.k} vectorEffect="non-scaling-stroke" onClick={(event) => handleCountryClick(event, meta)} style={{ cursor: 'pointer' }}><title>{meta.name}</title></path>
             })}
             {placeMarkers.map((place) => {
               if (typeof place.latitude !== 'number' || typeof place.longitude !== 'number') return null
@@ -293,7 +353,7 @@ export default function WorldMapView({
               if (!point) return null
               const canOpen = place.source === 'trip' && !!place.tripId && !!onOpenPlace
               const label = place.tripTitle ? `${place.name} · ${place.tripTitle}` : place.name
-              return <g key={`${place.source}-${place.id}`} transform={`translate(${point[0]} ${point[1]})`} role={canOpen ? 'button' : undefined} tabIndex={canOpen ? 0 : undefined} onClick={(event) => { event.stopPropagation(); if (canOpen && place.tripId) onOpenPlace?.(place.tripId, place.id) }} style={{ cursor: canOpen ? 'pointer' : 'default' }}>
+              return <g key={`${place.source}-${place.id}`} transform={`translate(${point[0]} ${point[1]})`} role={canOpen ? 'button' : undefined} tabIndex={canOpen ? 0 : undefined} onClick={(event) => { event.stopPropagation(); if (!didDragRef.current && canOpen && place.tripId) onOpenPlace?.(place.tripId, place.id) }} style={{ cursor: canOpen ? 'pointer' : 'default' }}>
                 <circle r={6 / transform.k} fill="#111" stroke="#fff" strokeWidth={2 / transform.k} />
                 <title>{label}</title>
               </g>
