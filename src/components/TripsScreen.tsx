@@ -31,13 +31,15 @@ export default function TripsScreen({ atlasId, profiles, onBack }: {
   profiles: Profile[]
   onBack: () => void
 }) {
+  const initialParams = new URLSearchParams(window.location.search)
   const [trips, setTrips] = useState<Trip[]>([])
   const [guestPeople, setGuestPeople] = useState<GuestPerson[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState(false)
-  const [selectedTripId, setSelectedTripId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('trip'))
+  const [selectedTripId, setSelectedTripId] = useState<string | null>(() => initialParams.get('trip'))
+  const [focusPlaceId, setFocusPlaceId] = useState<string | null>(() => initialParams.get('place'))
   const [saving, setSaving] = useState(false)
   const [title, setTitle] = useState('')
   const [startDate, setStartDate] = useState('')
@@ -128,6 +130,7 @@ export default function TripsScreen({ atlasId, profiles, onBack }: {
 
   function openTrip(id: string) {
     setSelectedTripId(id)
+    setFocusPlaceId(null)
     setEditing(false)
     window.history.replaceState({}, '', `${window.location.pathname}?trip=${id}`)
   }
@@ -192,7 +195,7 @@ export default function TripsScreen({ atlasId, profiles, onBack }: {
     return (
       <main className="trips-screen">
         <div className="trips-header">
-          <button className="back-btn" type="button" onClick={() => { setSelectedTripId(null); setEditing(false); resetForm(); window.history.replaceState({}, '', window.location.pathname) }}>← Trips</button>
+          <button className="back-btn" type="button" onClick={() => { setSelectedTripId(null); setFocusPlaceId(null); setEditing(false); resetForm(); window.history.replaceState({}, '', window.location.pathname) }}>← Trips</button>
           <div className="trip-header-actions"><span className="trip-visibility">{selectedTrip.visibility === 'private' ? 'Private' : 'Family Atlas'}</span>{!editing && <button className="secondary-btn" type="button" onClick={() => beginEdit(selectedTrip)}>Edit trip</button>}</div>
         </div>
         {error && <p className="auth-error trip-error" role="alert">{error}</p>}
@@ -205,7 +208,7 @@ export default function TripsScreen({ atlasId, profiles, onBack }: {
             {selectedTrip.countryIds.length > 0 && <div className="trip-tags" aria-label="Countries">{selectedTrip.countryIds.map((id) => <span key={id}>{countryNames.get(id) || id}</span>)}</div>}
             <section className="trip-detail-section"><h2>Who went?</h2><p>{selectedTrip.participantNames.join(', ') || 'Participants can be added later.'}</p></section>
             {selectedTrip.description && <section className="trip-detail-section"><h2>About this trip</h2><p>{selectedTrip.description}</p></section>}
-            <TripContentPanel atlasId={atlasId} trip={selectedTrip} profiles={profiles} />
+            <TripContentPanel atlasId={atlasId} trip={selectedTrip} profiles={profiles} focusPlaceId={focusPlaceId} />
           </article>
         )}
       </main>

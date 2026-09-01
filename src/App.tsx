@@ -131,6 +131,11 @@ export default function App() {
     window.history.replaceState({}, '', `${window.location.pathname}?trip=${encodeURIComponent(tripId)}`)
     setSection('trips')
   }
+  const handleOpenPlace = (tripId:string, placeId:string) => {
+    setProfile(null)
+    window.history.replaceState({}, '', `${window.location.pathname}?trip=${encodeURIComponent(tripId)}&place=${encodeURIComponent(placeId)}`)
+    setSection('trips')
+  }
   const handleSignOut = async () => {
     setProfile(null)
     setSection('home')
@@ -179,9 +184,11 @@ export default function App() {
         <>
           <MapView
             profile={profile}
+            personId={activeProfile?.personId}
             profileName={activeProfile?.name}
             defaultMapColor={activeProfile?.mapColour}
             onBack={handleBack}
+            onOpenPlace={handleOpenPlace}
             travelRepo={travelRepo}
             cloudVisited={cloudData?.visitedByProfile[profile]}
             cloudMapColor={activeProfile?.mapColour}

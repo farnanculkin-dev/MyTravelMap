@@ -1,6 +1,7 @@
 import { supabase } from './supabaseClient'
 
-export type TripPlace = { id:string; tripId:string; name:string; category?:string; countryId?:string; note?:string }
+export type TripPlace = { id:string; tripId:string; name:string; category?:string; countryId?:string; note?:string; latitude?:number; longitude?:number }
+export type PersonMapPlace = TripPlace & { tripTitle:string }
 export type TripMemory = { id:string; tripId:string; placeId?:string; personId?:string; title:string; body?:string; memoryDate?:string; photoUrl?:string }
 export type TripPhoto = { id:string; tripId:string; storagePath:string; caption?:string; signedUrl?:string }
 
@@ -9,6 +10,10 @@ async function sign(path?: string | null) {
   const { data, error } = await supabase.storage.from('atlas-media').createSignedUrl(path, 3600)
   if (error) throw new Error(error.message)
   return data.signedUrl
+}
+
+function mapPlace(r:any):TripPlace {
+  return {id:r.id,tripId:r.trip_id,name:r.name,...(r.category?{category:r.category}:{}),...(r.country_id?{countryId:r.country_id}:{}),...(r.note?{note:r.note}:{}),...(typeof r.latitude==='number'?{latitude:r.latitude}:{}),...(typeof r.longitude==='number'?{longitude:r.longitude}:{})}
 }
 
 export async function loadTripContent(tripId:string):Promise<{places:TripPlace[];memories:TripMemory[];photos:TripPhoto[]}> {
@@ -21,15 +26,45 @@ export async function loadTripContent(tripId:string):Promise<{places:TripPlace[]
   if (me) throw new Error(`Could not load memories: ${me.message}`)
   if (ie) throw new Error(`Could not load photos: ${ie.message}`)
   return {
-    places:(places||[]).map((r:any)=>({id:r.id,tripId:r.trip_id,name:r.name,...(r.category?{category:r.category}:{}),...(r.country_id?{countryId:r.country_id}:{}),...(r.note?{note:r.note}:{})})),
+    places:(places||[]).map(mapPlace),
     memories:await Promise.all((memories||[]).map(async(r:any)=>({id:r.id,tripId:r.trip_id,...(r.place_id?{placeId:r.place_id}:{}),...(r.person_id?{personId:r.person_id}:{}),title:r.title,...(r.body?{body:r.body}:{}),...(r.memory_date?{memoryDate:r.memory_date}:{}),...(r.photo_path?{photoUrl:await sign(r.photo_path)}:{})}))),
     photos:await Promise.all((media||[]).map(async(r:any)=>({id:r.id,tripId:r.trip_id,storagePath:r.storage_path,...(r.caption?{caption:r.caption}:{}),signedUrl:await sign(r.storage_path)}))),
   }
 }
 
-export async function addTripPlace(input:{tripId:string;name:string;category?:string;countryId?:string;note?:string}) {
-  const {error}=await supabase.from('trip_places').insert({trip_id:input.tripId,name:input.name.trim(),category:input.category?.trim()||null,country_id:input.countryId||null,note:input.note?.trim()||null})
+export async function addTripPlace(input:{tripId:string;name:string;category?:string;countryId?:string;note?:string;latitude?:number;longitude?:number}) {
+  const {error}=await supabase.from('trip_places').insert({trip_id:input.tripId,name:input.name.trim(),category:input.category?.trim()||null,country_id:input.countryId||null,note:input.note?.trim()||null,latitude:input.latitude??null,longitude:input.longitude??null})
   if(error) throw new Error(`Could not add place: ${error.message}`)
+}
+
+export async function updateTripPlaceCoordinates(placeId:string, latitude:number, longitude:number) {
+  const {error}=await supabase.from('trip_places').update({latitude,longitude}).eq('id',placeId)
+  if(error) throw new Error(`Could not save place on map: ${error.message}`)
+}
+
+export async function geocodePlace(name:string, countryName?:string):Promise<{latitude:number;longitude:number;label:string}|null> {
+  const query=[name.trim(),countryName?.trim()].filter(Boolean).join(', ')
+  if(!query) return null
+  const response=await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`,{headers:{Accept:'application/json'}})
+  if(!response.ok) throw new Error('Map lookup is temporarily unavailable.')
+  const rows=await response.json() as Array<{lat:string;lon:string;display_name:string}>
+  if(!rows[0]) return null
+  return {latitude:Number(rows[0].lat),longitude:Number(rows[0].lon),label:rows[0].display_name}
+}
+
+export async function loadPersonMapPlaces(personId:string):Promise<PersonMapPlace[]> {
+  const {data:participantRows,error:participantError}=await supabase.from('trip_participants').select('trip_id').eq('person_id',personId)
+  if(participantError) throw new Error(`Could not load place markers: ${participantError.message}`)
+  const tripIds=[...new Set((participantRows||[]).map((r:any)=>r.trip_id))]
+  if(tripIds.length===0) return []
+  const [{data:places,error:placeError},{data:trips,error:tripError}]=await Promise.all([
+    supabase.from('trip_places').select('id,trip_id,name,category,country_id,note,latitude,longitude').in('trip_id',tripIds).not('latitude','is',null).not('longitude','is',null),
+    supabase.from('trips').select('id,title').in('id',tripIds),
+  ])
+  if(placeError) throw new Error(`Could not load place markers: ${placeError.message}`)
+  if(tripError) throw new Error(`Could not load trip names: ${tripError.message}`)
+  const tripNames=new Map((trips||[]).map((r:any)=>[r.id,r.title]))
+  return (places||[]).map((r:any)=>({...mapPlace(r),tripTitle:tripNames.get(r.trip_id)||'Trip'}))
 }
 
 export async function addTripMemory(input:{tripId:string;title:string;body?:string;placeId?:string;personId?:string;memoryDate?:string}) {
