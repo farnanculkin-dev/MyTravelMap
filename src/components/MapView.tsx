@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { TravelRepository } from '../lib/TravelRepository'
-import { loadPersonMapPlaces, type PersonMapPlace } from '../lib/TripContentRuntime'
+import { addProfileMapPlace, deleteProfileMapPlace, geocodePlace, loadPersonMapPlaces, type PersonMapPlace } from '../lib/TripContentRuntime'
 import countries from '../data/countries.json'
 import { feature } from 'topojson-client'
 import * as d3 from 'd3-geo'
@@ -89,6 +89,9 @@ export default function MapView({
   const [saveError, setSaveError] = useState<string | null>(null)
   const [placeMarkers,setPlaceMarkers]=useState<PersonMapPlace[]>([])
   const [markerError,setMarkerError]=useState<string|null>(null)
+  const [expandedCountry,setExpandedCountry]=useState<string|null>(null)
+  const [quickPlaceName,setQuickPlaceName]=useState('')
+  const [placeBusy,setPlaceBusy]=useState(false)
 
   useEffect(() => {
     const v = new Set(cloudVisited || travelRepo.getVisited(profile))
@@ -96,13 +99,19 @@ export default function MapView({
     setMapColor(cloudMapColor || travelRepo.getMapColor(profile) || defaultMapColor || MAP_COLORS[0].value)
   }, [cloudMapColor, cloudVisited, defaultMapColor, profile, travelRepo])
 
+  async function refreshPlaceMarkers() {
+    if(!personId){setPlaceMarkers([]);return}
+    const rows=await loadPersonMapPlaces(personId,profile)
+    setPlaceMarkers(rows)
+  }
+
   useEffect(()=>{
     if(!personId){setPlaceMarkers([]);return}
     let cancelled=false
     setMarkerError(null)
-    loadPersonMapPlaces(personId).then((rows)=>{if(!cancelled)setPlaceMarkers(rows)}).catch((error)=>{if(!cancelled)setMarkerError(error instanceof Error?error.message:'Places could not be loaded.')})
+    loadPersonMapPlaces(personId,profile).then((rows)=>{if(!cancelled)setPlaceMarkers(rows)}).catch((error)=>{if(!cancelled)setMarkerError(error instanceof Error?error.message:'Places could not be loaded.')})
     return()=>{cancelled=true}
-  },[personId])
+  },[personId,profile])
 
   useEffect(() => {
     let cancelled = false
@@ -130,6 +139,7 @@ export default function MapView({
         const featuresMatched: any[] = []
         const missingList: string[] = []
         countries.forEach((c: any) => {
+          if (c.mapVisible === false) return
           const mapFeature = byMapId.get(c.id)
           if (mapFeature) {
             featuresMatched.push({ ...mapFeature, travelId: c.id })
@@ -153,18 +163,54 @@ export default function MapView({
     }
   }, [])
 
+  async function persistVisited(next:Set<string>) {
+    setVisited(next)
+    setSaveError(null)
+    if (onSaveVisited) await onSaveVisited(Array.from(next))
+    else travelRepo.setVisited(profile, Array.from(next))
+  }
+
   async function toggleCountry(countryId: string) {
     const next = new Set(visited)
     if (next.has(countryId)) next.delete(countryId)
     else next.add(countryId)
-    setVisited(next)
-    setSaveError(null)
     try {
-      if (onSaveVisited) await onSaveVisited(Array.from(next))
-      else travelRepo.setVisited(profile, Array.from(next))
+      await persistVisited(next)
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : 'Could not save travel changes.')
     }
+  }
+
+  async function addQuickPlace(event:React.FormEvent, country:any) {
+    event.preventDefault()
+    const name=quickPlaceName.trim()
+    if(!name||!personId)return
+    const alreadyExists=placeMarkers.some((place)=>place.countryId===country.id&&place.name.trim().toLocaleLowerCase()===name.toLocaleLowerCase())
+    if(alreadyExists){setMarkerError(`${name} is already shown for ${country.name}.`);return}
+    setPlaceBusy(true)
+    setMarkerError(null)
+    try {
+      const located=await geocodePlace(name,country.name)
+      if(!located)throw new Error(`We could not find ${name} in ${country.name}. Try a more specific place name.`)
+      await addProfileMapPlace({profileId:profile,countryId:country.id,name,latitude:located.latitude,longitude:located.longitude})
+      if(!visited.has(country.id)){
+        const next=new Set(visited);next.add(country.id);await persistVisited(next)
+      }
+      setQuickPlaceName('')
+      await refreshPlaceMarkers()
+    } catch(error) {
+      setMarkerError(error instanceof Error?error.message:'Place could not be added to the map.')
+    } finally {
+      setPlaceBusy(false)
+    }
+  }
+
+  async function removeQuickPlace(place:PersonMapPlace) {
+    if(place.source!=='map'||!window.confirm(`Remove ${place.name} from this map?`))return
+    setPlaceBusy(true);setMarkerError(null)
+    try{await deleteProfileMapPlace(place.id);await refreshPlaceMarkers()}
+    catch(error){setMarkerError(error instanceof Error?error.message:'Place could not be removed.')}
+    finally{setPlaceBusy(false)}
   }
 
   async function selectMapColor(color: string) {
@@ -267,30 +313,46 @@ export default function MapView({
                 if(typeof place.latitude!=='number'||typeof place.longitude!=='number')return null
                 const point=projection([place.longitude,place.latitude])
                 if(!point)return null
-                return <g key={place.id} className="place-marker" role="button" tabIndex={0} aria-label={`${place.name}, ${place.tripTitle}`} onClick={()=>onOpenPlace?.(place.tripId,place.id)} onKeyDown={(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();onOpenPlace?.(place.tripId,place.id)}}} style={{cursor:onOpenPlace?'pointer':'default'}}>
+                const canOpen=place.source==='trip'&&!!place.tripId&&!!onOpenPlace
+                const label=place.tripTitle?`${place.name} · ${place.tripTitle}`:place.name
+                return <g key={`${place.source}-${place.id}`} className="place-marker" role={canOpen?'button':undefined} tabIndex={canOpen?0:undefined} aria-label={label} onClick={()=>{if(canOpen&&place.tripId)onOpenPlace?.(place.tripId,place.id)}} onKeyDown={(e)=>{if(canOpen&&place.tripId&&(e.key==='Enter'||e.key===' ')){e.preventDefault();onOpenPlace?.(place.tripId,place.id)}}} style={{cursor:canOpen?'pointer':'default'}}>
                   <circle cx={point[0]} cy={point[1]} r={6.5} fill="#111" stroke="#fff" strokeWidth={2}/>
-                  <title>{`${place.name} · ${place.tripTitle}`}</title>
+                  <title>{label}</title>
                 </g>
               })}
             </g>
           </svg>
-          {placeMarkers.length>0&&<p className="map-place-help">● Place markers show cities and places from this person’s trips. Tap or click a dot to open that place.</p>}
+          {placeMarkers.length>0&&<p className="map-place-help">● Place markers show cities and places added directly to this map or recorded in Trips. Trip places can be opened by clicking their dot.</p>}
         </div>
 
         <aside className="country-checklist" aria-label="Country checklist">
           <h3>Countries</h3>
+          <p className="country-help">Tick a country as before. Click its name to quickly add cities or places.</p>
           <div className="country-list">
-            {countries.map((country: any) => (
-              <label className="country-row" key={country.id}>
-                <input
-                  type="checkbox"
-                  checked={visited.has(country.id)}
-                  onChange={() => toggleCountry(country.id)}
-                  style={{ accentColor: mapColor }}
-                />
-                <span>{country.name}</span>
-              </label>
-            ))}
+            {countries.map((country: any) => {
+              const countryPlaces=placeMarkers.filter((place)=>place.countryId===country.id)
+              const expanded=expandedCountry===country.id
+              return <div className={`country-entry${expanded?' expanded':''}`} key={country.id}>
+                <div className="country-row">
+                  <input
+                    type="checkbox"
+                    checked={visited.has(country.id)}
+                    onChange={() => toggleCountry(country.id)}
+                    style={{ accentColor: mapColor }}
+                    aria-label={`Visited ${country.name}`}
+                  />
+                  <button className="country-name-btn" type="button" aria-expanded={expanded} onClick={()=>{setExpandedCountry(expanded?null:country.id);setQuickPlaceName('');setMarkerError(null)}}>{country.name}</button>
+                  {countryPlaces.length>0&&<span className="country-place-count" title={`${countryPlaces.length} places`}>{countryPlaces.length}</span>}
+                </div>
+                {expanded&&<div className="country-place-editor">
+                  <form onSubmit={(event)=>void addQuickPlace(event,country)}>
+                    <input value={quickPlaceName} onChange={(event)=>setQuickPlaceName(event.target.value)} placeholder={`Add a city or place in ${country.name}`} aria-label={`Add a city or place in ${country.name}`} disabled={placeBusy}/>
+                    <button type="submit" disabled={placeBusy||!quickPlaceName.trim()}>{placeBusy?'Adding…':'Add'}</button>
+                  </form>
+                  {countryPlaces.length>0&&<div className="country-place-list">{countryPlaces.map((place)=><div key={`${place.source}-${place.id}`}><span>● {place.name}</span>{place.source==='map'?<button type="button" onClick={()=>void removeQuickPlace(place)} disabled={placeBusy} aria-label={`Remove ${place.name}`}>×</button>:<small>Trip</small>}</div>)}</div>}
+                </div>}
+              </div>
+            })}
           </div>
         </aside>
       </div>
