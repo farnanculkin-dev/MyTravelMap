@@ -131,6 +131,11 @@ export default function App() {
     window.history.replaceState({}, '', `${window.location.pathname}?trip=${encodeURIComponent(tripId)}`)
     setSection('trips')
   }
+  const handleOpenPlace = (tripId:string, placeId:string) => {
+    setProfile(null)
+    window.history.replaceState({}, '', `${window.location.pathname}?trip=${encodeURIComponent(tripId)}&place=${encodeURIComponent(placeId)}`)
+    setSection('trips')
+  }
   const handleSignOut = async () => {
     setProfile(null)
     setSection('home')
@@ -155,7 +160,7 @@ export default function App() {
   const activeProfile = activeProfiles.find((current) => current.id === profile)
   const uploadImage = async (kind: 'group' | 'profile', profileId: string | undefined, imageData: string) => {
     if (kind === 'group' && membership.role !== 'admin') throw new Error('Only an Atlas administrator can change the group photo.')
-    const signedUrl = await uploadCloudMedia({ atlasId: membership.atlasId, profileId, kind, dataUrl: imageData })
+    const signedUrl = await uploadCloudMedia({ atlasId: membership.atlasId, profileId, kind, imageData })
     setCloudData((current) => current ? {
       ...current,
       groupImage: kind === 'group' ? signedUrl : current.groupImage,
@@ -179,9 +184,11 @@ export default function App() {
         <>
           <MapView
             profile={profile}
+            personId={activeProfile?.personId}
             profileName={activeProfile?.name}
             defaultMapColor={activeProfile?.mapColour}
             onBack={handleBack}
+            onOpenPlace={handleOpenPlace}
             travelRepo={travelRepo}
             cloudVisited={cloudData?.visitedByProfile[profile]}
             cloudMapColor={activeProfile?.mapColour}
