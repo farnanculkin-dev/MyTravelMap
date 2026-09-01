@@ -3,7 +3,7 @@ import { supabase } from './supabaseClient'
 export type TripPlace = { id:string; tripId:string; name:string; category?:string; countryId?:string; note?:string; latitude?:number; longitude?:number }
 export type PersonMapPlace = TripPlace & { tripTitle:string }
 export type TripMemory = { id:string; tripId:string; placeId?:string; personId?:string; title:string; body?:string; memoryDate?:string; photoUrl?:string; photoPath?:string }
-export type TripPhoto = { id:string; tripId:string; storagePath:string; caption?:string; signedUrl?:string }
+export type TripPhoto = { id:string; tripId:string; storagePath:string; caption?:string; signedUrl?:string; mediaKind:'photo'|'video' }
 
 async function sign(path?: string | null) {
   if (!path) return undefined
@@ -24,11 +24,11 @@ export async function loadTripContent(tripId:string):Promise<{places:TripPlace[]
   ])
   if (pe) throw new Error(`Could not load places: ${pe.message}`)
   if (me) throw new Error(`Could not load memories: ${me.message}`)
-  if (ie) throw new Error(`Could not load photos: ${ie.message}`)
+  if (ie) throw new Error(`Could not load media: ${ie.message}`)
   return {
     places:(places||[]).map(mapPlace),
     memories:await Promise.all((memories||[]).map(async(r:any)=>({id:r.id,tripId:r.trip_id,...(r.place_id?{placeId:r.place_id}:{}),...(r.person_id?{personId:r.person_id}:{}),title:r.title,...(r.body?{body:r.body}:{}),...(r.memory_date?{memoryDate:r.memory_date}:{}),...(r.photo_path?{photoPath:r.photo_path,photoUrl:await sign(r.photo_path)}:{})}))),
-    photos:await Promise.all((media||[]).map(async(r:any)=>({id:r.id,tripId:r.trip_id,storagePath:r.storage_path,...(r.caption?{caption:r.caption}:{}),signedUrl:await sign(r.storage_path)}))),
+    photos:await Promise.all((media||[]).map(async(r:any)=>({id:r.id,tripId:r.trip_id,storagePath:r.storage_path,mediaKind:r.media_kind==='video'?'video':'photo',...(r.caption?{caption:r.caption}:{}),signedUrl:await sign(r.storage_path)}))),
   }
 }
 
@@ -75,18 +75,27 @@ export async function addTripMemory(input:{tripId:string;title:string;body?:stri
 
 function dataUrlToBlob(dataUrl:string){
   const [header,encoded]=dataUrl.split(',',2); const mime=header.match(/^data:([^;]+);base64$/)?.[1]
-  if(!mime||!encoded) throw new Error('Invalid image data')
+  if(!mime||!encoded) throw new Error('Invalid media data')
   const binary=atob(encoded); const bytes=new Uint8Array(binary.length)
   for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i)
-  return {blob:new Blob([bytes],{type:mime}),mime,ext:(mime.split('/')[1]||'webp').replace('jpeg','jpg')}
+  return {blob:new Blob([bytes],{type:mime}),mime,ext:(mime.split('/')[1]||'bin').replace('jpeg','jpg').replace('quicktime','mov')}
+}
+
+async function uploadTripMedia(input:{atlasId:string;tripId:string;dataUrl:string;caption?:string;mediaKind:'photo'|'video'}) {
+  const {blob,mime,ext}=dataUrlToBlob(input.dataUrl)
+  const path=`${input.atlasId}/trips/${input.tripId}/${input.mediaKind}s/${crypto.randomUUID()}.${ext}`
+  const {error:ue}=await supabase.storage.from('atlas-media').upload(path,blob,{contentType:mime,upsert:false})
+  if(ue) throw new Error(`Could not upload trip ${input.mediaKind}: ${ue.message}`)
+  const {error}=await supabase.from('trip_media').insert({trip_id:input.tripId,storage_path:path,caption:input.caption?.trim()||null,media_kind:input.mediaKind})
+  if(error) throw new Error(`Could not save trip ${input.mediaKind}: ${error.message}`)
 }
 
 export async function uploadTripPhoto(input:{atlasId:string;tripId:string;dataUrl:string;caption?:string}) {
-  const {blob,mime,ext}=dataUrlToBlob(input.dataUrl); const path=`${input.atlasId}/trips/${input.tripId}/${crypto.randomUUID()}.${ext}`
-  const {error:ue}=await supabase.storage.from('atlas-media').upload(path,blob,{contentType:mime,upsert:false})
-  if(ue) throw new Error(`Could not upload trip photo: ${ue.message}`)
-  const {error}=await supabase.from('trip_media').insert({trip_id:input.tripId,storage_path:path,caption:input.caption?.trim()||null})
-  if(error) throw new Error(`Could not save trip photo: ${error.message}`)
+  return uploadTripMedia({...input,mediaKind:'photo'})
+}
+
+export async function uploadTripVideo(input:{atlasId:string;tripId:string;dataUrl:string;caption?:string}) {
+  return uploadTripMedia({...input,mediaKind:'video'})
 }
 
 export async function uploadTripCoverPhoto(input:{atlasId:string;tripId:string;dataUrl:string}) {
@@ -107,8 +116,8 @@ export async function uploadMemoryPhoto(input:{atlasId:string;tripId:string;memo
 }
 
 export async function deleteTripPhoto(photo:TripPhoto){
-  const {error:storageError}=await supabase.storage.from('atlas-media').remove([photo.storagePath]); if(storageError)throw new Error(`Could not remove photo file: ${storageError.message}`)
-  const {error}=await supabase.from('trip_media').delete().eq('id',photo.id); if(error)throw new Error(`Could not remove trip photo: ${error.message}`)
+  const {error:storageError}=await supabase.storage.from('atlas-media').remove([photo.storagePath]); if(storageError)throw new Error(`Could not remove media file: ${storageError.message}`)
+  const {error}=await supabase.from('trip_media').delete().eq('id',photo.id); if(error)throw new Error(`Could not remove trip media: ${error.message}`)
 }
 export async function deleteTripPlace(placeId:string){const {error}=await supabase.from('trip_places').delete().eq('id',placeId);if(error)throw new Error(`Could not remove place: ${error.message}`)}
 export async function deleteTripMemory(memory:TripMemory){if(memory.photoPath){const {error:storageError}=await supabase.storage.from('atlas-media').remove([memory.photoPath]);if(storageError)throw new Error(`Could not remove memory photo: ${storageError.message}`)}const {error}=await supabase.from('trip_memories').delete().eq('id',memory.id);if(error)throw new Error(`Could not remove memory: ${error.message}`)}
