@@ -1,7 +1,7 @@
 import { supabase } from './supabaseClient'
 
 export type TripPlace = { id:string; tripId:string; name:string; category?:string; countryId?:string; note?:string; latitude?:number; longitude?:number }
-export type PersonMapPlace = TripPlace & { tripTitle:string }
+export type PersonMapPlace = { id:string; name:string; countryId?:string; latitude?:number; longitude?:number; source:'trip'|'map'; tripId?:string; tripTitle?:string }
 export type TripMemory = { id:string; tripId:string; placeId?:string; personId?:string; title:string; body?:string; memoryDate?:string; photoUrl?:string; photoPath?:string }
 export type TripPhoto = { id:string; tripId:string; storagePath:string; caption?:string; signedUrl?:string; mediaKind:'photo'|'video' }
 
@@ -52,11 +52,32 @@ export async function geocodePlace(name:string, countryName?:string):Promise<{la
   return {latitude:Number(rows[0].lat),longitude:Number(rows[0].lon),label:rows[0].display_name}
 }
 
-export async function loadPersonMapPlaces(personId:string):Promise<PersonMapPlace[]> {
-  const {data:participantRows,error:participantError}=await supabase.from('trip_participants').select('trip_id').eq('person_id',personId)
+export async function addProfileMapPlace(input:{profileId:string;countryId:string;name:string;latitude:number;longitude:number}) {
+  const {error}=await supabase.from('profile_map_places').insert({
+    profile_id:input.profileId,
+    country_id:input.countryId,
+    name:input.name.trim(),
+    latitude:input.latitude,
+    longitude:input.longitude,
+  })
+  if(error) throw new Error(error.code==='23505' ? `${input.name.trim()} is already on this map.` : `Could not add place to map: ${error.message}`)
+}
+
+export async function deleteProfileMapPlace(placeId:string) {
+  const {error}=await supabase.from('profile_map_places').delete().eq('id',placeId)
+  if(error) throw new Error(`Could not remove place from map: ${error.message}`)
+}
+
+export async function loadPersonMapPlaces(personId:string, profileId?:string):Promise<PersonMapPlace[]> {
+  const [{data:participantRows,error:participantError},{data:quickRows,error:quickError}] = await Promise.all([
+    supabase.from('trip_participants').select('trip_id').eq('person_id',personId),
+    profileId ? supabase.from('profile_map_places').select('id,name,country_id,latitude,longitude').eq('profile_id',profileId).order('created_at') : Promise.resolve({data:[],error:null} as any),
+  ])
   if(participantError) throw new Error(`Could not load place markers: ${participantError.message}`)
+  if(quickError) throw new Error(`Could not load map places: ${quickError.message}`)
+  const quickPlaces:PersonMapPlace[]=(quickRows||[]).map((r:any)=>({id:r.id,name:r.name,countryId:r.country_id,latitude:r.latitude,longitude:r.longitude,source:'map'}))
   const tripIds=[...new Set((participantRows||[]).map((r:any)=>r.trip_id))]
-  if(tripIds.length===0) return []
+  if(tripIds.length===0) return quickPlaces
   const [{data:places,error:placeError},{data:trips,error:tripError}]=await Promise.all([
     supabase.from('trip_places').select('id,trip_id,name,category,country_id,note,latitude,longitude').in('trip_id',tripIds).not('latitude','is',null).not('longitude','is',null),
     supabase.from('trips').select('id,title').in('id',tripIds),
@@ -64,7 +85,14 @@ export async function loadPersonMapPlaces(personId:string):Promise<PersonMapPlac
   if(placeError) throw new Error(`Could not load place markers: ${placeError.message}`)
   if(tripError) throw new Error(`Could not load trip names: ${tripError.message}`)
   const tripNames=new Map((trips||[]).map((r:any)=>[r.id,r.title]))
-  return (places||[]).map((r:any)=>({...mapPlace(r),tripTitle:tripNames.get(r.trip_id)||'Trip'}))
+  const tripPlaces:PersonMapPlace[]=(places||[]).map((r:any)=>({id:r.id,name:r.name,countryId:r.country_id,latitude:r.latitude,longitude:r.longitude,source:'trip',tripId:r.trip_id,tripTitle:tripNames.get(r.trip_id)||'Trip'}))
+  const seen=new Set<string>()
+  return [...tripPlaces,...quickPlaces].filter((place)=>{
+    const key=`${place.countryId||''}|${place.name.trim().toLocaleLowerCase()}`
+    if(seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 export async function addTripMemory(input:{tripId:string;title:string;body?:string;placeId?:string;personId?:string;memoryDate?:string}) {

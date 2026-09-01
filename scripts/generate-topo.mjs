@@ -115,6 +115,7 @@ function offsetArcReferences(value, offset) {
 }
 
 const countries = JSON.parse(await readFile(countriesPath, 'utf8'))
+const mapCountries = countries.filter((country) => country.mapVisible !== false)
 const naturalEarth = await fetchJson(NATURAL_EARTH_URL)
 const requiredCodes = new Set(Object.values(naturalEarthIdByAppId))
 const naturalCandidates = naturalEarth.features
@@ -191,13 +192,13 @@ if (!foundContextIds.has('LY') || !foundContextIds.has('EG') || !foundContextIds
   throw new Error('Natural Earth map data missing required context features (Libya, Egypt, Israel, Syria)')
 }
 
-const expectedIds = new Set(countries.map((country) => country.id))
+const expectedIds = new Set(mapCountries.map((country) => country.id))
 const combinedFeatures = [...naturalFeatures, ...ukFeatures]
 const matchedIds = new Set(combinedFeatures.map((candidate) => candidate.properties.mapId))
-const missingIds = countries.filter((country) => !matchedIds.has(country.id)).map((country) => country.id)
+const missingIds = mapCountries.filter((country) => !matchedIds.has(country.id)).map((country) => country.id)
 if (missingIds.length > 0) throw new Error(`Map generation missing country IDs: ${missingIds.join(', ')}`)
 if (combinedFeatures.length !== expectedIds.size) {
-  throw new Error(`Map generation emitted ${combinedFeatures.length} features for ${expectedIds.size} countries`)
+  throw new Error(`Map generation emitted ${combinedFeatures.length} features for ${expectedIds.size} mapped countries`)
 }
 
 await mkdir(dirname(outputPath), { recursive: true })

@@ -1,12 +1,12 @@
 import { supabase } from './supabaseClient'
 
-export async function inviteMum(atlasId: string, email: string): Promise<void> {
+export async function inviteAtlasMember(atlasId: string, profileKey: string, email: string): Promise<void> {
   const { error } = await supabase.rpc('create_atlas_member_invitation', {
     p_atlas_id: atlasId,
-    p_profile_key: 'mum',
+    p_profile_key: profileKey,
     p_email: email.trim(),
   })
-  if (error) throw new Error(`Could not create Mum's invitation: ${error.message}`)
+  if (error) throw new Error(`Could not create the Family Atlas invitation: ${error.message}`)
 
   const { error: emailError } = await supabase.auth.signInWithOtp({
     email: email.trim(),

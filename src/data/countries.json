@@ -7,6 +7,7 @@
   { "id": "GB-NIR", "name": "Northern Ireland", "topoName": "Northern Ireland" },
   { "id": "PT", "name": "Portugal", "topoName": "Portugal" },
   { "id": "ES", "name": "Spain", "topoName": "Spain" },
+  { "id": "GI", "name": "Gibraltar", "topoName": "Gibraltar", "mapVisible": false },
   { "id": "FR", "name": "France", "topoName": "France" },
   { "id": "BE", "name": "Belgium", "topoName": "Belgium" },
   { "id": "NL", "name": "Netherlands", "topoName": "Netherlands" },
