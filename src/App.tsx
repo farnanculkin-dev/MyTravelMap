@@ -160,7 +160,7 @@ export default function App() {
   const activeProfile = activeProfiles.find((current) => current.id === profile)
   const uploadImage = async (kind: 'group' | 'profile', profileId: string | undefined, imageData: string) => {
     if (kind === 'group' && membership.role !== 'admin') throw new Error('Only an Atlas administrator can change the group photo.')
-    const signedUrl = await uploadCloudMedia({ atlasId: membership.atlasId, profileId, kind, imageData })
+    const signedUrl = await uploadCloudMedia({ atlasId: membership.atlasId, profileId, kind, dataUrl: imageData })
     setCloudData((current) => current ? {
       ...current,
       groupImage: kind === 'group' ? signedUrl : current.groupImage,
