@@ -36,6 +36,7 @@ export default function App() {
   const [cloudError, setCloudError] = useState<string | null>(null)
   const [profile, setProfile] = useState<string | null>(null)
   const [section, setSection] = useState<AppSection>(() => new URLSearchParams(window.location.search).has('trip') ? 'trips' : 'home')
+  const [newTripPersonId,setNewTripPersonId]=useState<string|null>(()=>new URLSearchParams(window.location.search).get('newTripPerson'))
   const activeProfiles = cloudData?.profiles || fallbackProfiles
 
   useEffect(() => {
@@ -43,16 +44,9 @@ export default function App() {
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       if (mounted) { setSession(currentSession); setAuthLoading(false) }
     }).catch((error: unknown) => {
-      if (mounted) {
-        console.error('Could not restore Supabase session', error)
-        setSession(null)
-        setAuthLoading(false)
-      }
+      if (mounted) { console.error('Could not restore Supabase session', error); setSession(null); setAuthLoading(false) }
     })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession)
-      setAuthLoading(false)
-    })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => { setSession(nextSession); setAuthLoading(false) })
     return () => { mounted = false; subscription.unsubscribe() }
   }, [])
 
@@ -68,88 +62,32 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (!session) {
-      setMembership(null)
-      setMembershipLoading(false)
-      setMembershipError(null)
-      setSection('home')
-      return
-    }
+    if (!session) { setMembership(null); setMembershipLoading(false); setMembershipError(null); setSection('home'); return }
     let mounted = true
-    setMembershipLoading(true)
-    setMembershipError(null)
-    consumePendingInvitation()
-      .then(() => getCurrentUserAtlasMembership())
-      .then((currentMembership) => { if (mounted) setMembership(currentMembership) })
-      .catch((error: unknown) => { if (mounted) setMembershipError(error instanceof Error ? error.message : 'Could not load your Atlas membership.') })
-      .finally(() => { if (mounted) setMembershipLoading(false) })
+    setMembershipLoading(true); setMembershipError(null)
+    consumePendingInvitation().then(() => getCurrentUserAtlasMembership()).then((currentMembership) => { if (mounted) setMembership(currentMembership) }).catch((error: unknown) => { if (mounted) setMembershipError(error instanceof Error ? error.message : 'Could not load your Atlas membership.') }).finally(() => { if (mounted) setMembershipLoading(false) })
     return () => { mounted = false }
   }, [session])
 
   useEffect(() => {
     if (!membership) { setCloudData(null); setCloudLoading(false); return }
     let mounted = true
-    setCloudLoading(true)
-    setCloudError(null)
-    loadSupabaseAtlas(membership.atlasId)
-      .then((data) => { if (mounted) setCloudData(data) })
-      .catch((error: unknown) => { if (mounted) setCloudError(error instanceof Error ? error.message : 'Cloud Atlas data could not be loaded.') })
-      .finally(() => { if (mounted) setCloudLoading(false) })
+    setCloudLoading(true); setCloudError(null)
+    loadSupabaseAtlas(membership.atlasId).then((data) => { if (mounted) setCloudData(data) }).catch((error: unknown) => { if (mounted) setCloudError(error instanceof Error ? error.message : 'Cloud Atlas data could not be loaded.') }).finally(() => { if (mounted) setCloudLoading(false) })
     return () => { mounted = false }
   }, [membership])
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const urlProfile = params.get('profile')
-    if (urlProfile) setProfile(urlProfile)
-  }, [])
+  useEffect(() => { const params = new URLSearchParams(window.location.search); const urlProfile = params.get('profile'); if (urlProfile) setProfile(urlProfile) }, [])
+  useEffect(() => { if (profile && !activeProfiles.some((current) => current.id === profile)) { setProfile(null); window.history.replaceState({}, '', window.location.pathname) } }, [activeProfiles, profile])
 
-  useEffect(() => {
-    if (profile && !activeProfiles.some((current) => current.id === profile)) {
-      setProfile(null)
-      window.history.replaceState({}, '', window.location.pathname)
-    }
-  }, [activeProfiles, profile])
-
-  const handleSelectProfile = (profileId: string) => {
-    setSection('home')
-    setProfile(profileId)
-    window.history.pushState({}, '', `?profile=${profileId}`)
-  }
-  const handleBack = () => {
-    setProfile(null)
-    setSection('home')
-    window.history.pushState({}, '', window.location.pathname)
-  }
-  const handleOpenTrips = () => {
-    setProfile(null)
-    setSection('trips')
-    window.history.replaceState({}, '', window.location.pathname)
-  }
-  const handleOpenTrip = (tripId: string) => {
-    setProfile(null)
-    window.history.replaceState({}, '', `${window.location.pathname}?trip=${encodeURIComponent(tripId)}`)
-    setSection('trips')
-  }
-  const handleOpenPlace = (tripId:string, placeId:string) => {
-    setProfile(null)
-    window.history.replaceState({}, '', `${window.location.pathname}?trip=${encodeURIComponent(tripId)}&place=${encodeURIComponent(placeId)}`)
-    setSection('trips')
-  }
-  const handleSignOut = async () => {
-    setProfile(null)
-    setSection('home')
-    window.history.replaceState({}, '', window.location.pathname)
-    const { error } = await supabase.auth.signOut()
-    if (error) console.error('Error signing out', error)
-  }
-  const handleCreateAtlas = async (details: { atlasName: string; atlasType: 'family' | 'individual'; profileName: string }) => {
-    setIsCreatingAtlas(true)
-    setMembershipError(null)
-    try { setMembership(await createCustomerZeroAtlas({ ...details, mapColour: '#4f86c6' })) }
-    catch (error: unknown) { setMembershipError(error instanceof Error ? error.message : 'Could not create your Atlas.') }
-    finally { setIsCreatingAtlas(false) }
-  }
+  const handleSelectProfile = (profileId: string) => { setSection('home'); setProfile(profileId); window.history.pushState({}, '', `?profile=${profileId}`) }
+  const handleBack = () => { setProfile(null); setSection('home'); setNewTripPersonId(null); window.history.pushState({}, '', window.location.pathname) }
+  const handleOpenTrips = () => { setProfile(null); setNewTripPersonId(null); setSection('trips'); window.history.replaceState({}, '', window.location.pathname) }
+  const handleOpenTrip = (tripId: string) => { setProfile(null); setNewTripPersonId(null); window.history.replaceState({}, '', `${window.location.pathname}?trip=${encodeURIComponent(tripId)}`); setSection('trips') }
+  const handleOpenPlace = (tripId:string, placeId:string) => { setProfile(null); setNewTripPersonId(null); window.history.replaceState({}, '', `${window.location.pathname}?trip=${encodeURIComponent(tripId)}&place=${encodeURIComponent(placeId)}`); setSection('trips') }
+  const handleAddTripForPerson=(personId:string)=>{setProfile(null);setNewTripPersonId(personId);setSection('trips');window.history.replaceState({},'',`${window.location.pathname}?newTripPerson=${encodeURIComponent(personId)}`)}
+  const handleSignOut = async () => { setProfile(null); setSection('home'); setNewTripPersonId(null); window.history.replaceState({}, '', window.location.pathname); const { error } = await supabase.auth.signOut(); if (error) console.error('Error signing out', error) }
+  const handleCreateAtlas = async (details: { atlasName: string; atlasType: 'family' | 'individual'; profileName: string }) => { setIsCreatingAtlas(true); setMembershipError(null); try { setMembership(await createCustomerZeroAtlas({ ...details, mapColour: '#4f86c6' })) } catch (error: unknown) { setMembershipError(error instanceof Error ? error.message : 'Could not create your Atlas.') } finally { setIsCreatingAtlas(false) } }
 
   if (authLoading) return <main className="auth-loading" role="status">Loading Family Atlas...</main>
   if (!session) return <AuthScreen />
@@ -161,46 +99,16 @@ export default function App() {
   const uploadImage = async (kind: 'group' | 'profile', profileId: string | undefined, imageData: string) => {
     if (kind === 'group' && membership.role !== 'admin') throw new Error('Only an Atlas administrator can change the group photo.')
     const signedUrl = await uploadCloudMedia({ atlasId: membership.atlasId, profileId, kind, dataUrl: imageData })
-    setCloudData((current) => current ? {
-      ...current,
-      groupImage: kind === 'group' ? signedUrl : current.groupImage,
-      profileImages: kind === 'profile' && profileId ? { ...current.profileImages, [profileId]: signedUrl } : current.profileImages,
-    } : current)
+    setCloudData((current) => current ? { ...current, groupImage: kind === 'group' ? signedUrl : current.groupImage, profileImages: kind === 'profile' && profileId ? { ...current.profileImages, [profileId]: signedUrl } : current.profileImages } : current)
   }
 
-  return (
-    <div className="app">
-      <div className="auth-toolbar">
-        <span>Signed in as {session.user.email || 'Family Atlas member'}</span>
-        <button className="sign-out-btn" type="button" onClick={handleSignOut}>Sign out</button>
-      </div>
-      {section === 'home' && !profile && membership.role === 'admin' && <MemberInvitePanel atlasId={membership.atlasId} />}
-      {cloudError && <p className="cloud-error" role="alert">Cloud data could not be loaded. Showing local fallback data. {cloudError}</p>}
-      {section === 'trips' ? (
-        <TripsScreen atlasId={membership.atlasId} profiles={activeProfiles} onBack={handleBack} />
-      ) : !profile ? (
-        <HomeProfiles profiles={activeProfiles} onSelect={handleSelectProfile} onTrips={handleOpenTrips} groupImage={cloudData?.groupImage} profileImages={cloudData?.profileImages} onUploadImage={cloudData ? uploadImage : undefined} />
-      ) : (
-        <>
-          <MapView
-            profile={profile}
-            personId={activeProfile?.personId}
-            profileName={activeProfile?.name}
-            defaultMapColor={activeProfile?.mapColour}
-            onBack={handleBack}
-            onOpenPlace={handleOpenPlace}
-            travelRepo={travelRepo}
-            cloudVisited={cloudData?.visitedByProfile[profile]}
-            cloudMapColor={activeProfile?.mapColour}
-            onSaveVisited={cloudData ? (visited) => saveCloudVisited(profile, visited) : undefined}
-            onSaveMapColor={cloudData ? async (color) => {
-              await saveCloudMapColour(profile, color)
-              setCloudData((current) => current ? { ...current, profiles: current.profiles.map((item) => item.id === profile ? { ...item, mapColour: color } : item) } : current)
-            } : undefined}
-          />
-          <ProfileTripsPanel atlasId={membership.atlasId} personId={activeProfile?.personId} personName={activeProfile?.name || 'Traveller'} onOpenTrip={handleOpenTrip} />
-        </>
-      )}
-    </div>
-  )
+  return <div className="app">
+    <div className="auth-toolbar"><span>Signed in as {session.user.email || 'Family Atlas member'}</span><button className="sign-out-btn" type="button" onClick={handleSignOut}>Sign out</button></div>
+    {section === 'home' && !profile && membership.role === 'admin' && <MemberInvitePanel atlasId={membership.atlasId} />}
+    {cloudError && <p className="cloud-error" role="alert">Cloud data could not be loaded. Showing local fallback data. {cloudError}</p>}
+    {section === 'trips' ? <TripsScreen atlasId={membership.atlasId} profiles={activeProfiles} onBack={handleBack} initialParticipantId={newTripPersonId||undefined} /> : !profile ? <HomeProfiles profiles={activeProfiles} onSelect={handleSelectProfile} onTrips={handleOpenTrips} groupImage={cloudData?.groupImage} profileImages={cloudData?.profileImages} onUploadImage={cloudData ? uploadImage : undefined} /> : <>
+      <MapView profile={profile} personId={activeProfile?.personId} profileName={activeProfile?.name} defaultMapColor={activeProfile?.mapColour} onBack={handleBack} onOpenPlace={handleOpenPlace} travelRepo={travelRepo} cloudVisited={cloudData?.visitedByProfile[profile]} cloudMapColor={activeProfile?.mapColour} onSaveVisited={cloudData ? (visited) => saveCloudVisited(profile, visited) : undefined} onSaveMapColor={cloudData ? async (color) => { await saveCloudMapColour(profile, color); setCloudData((current) => current ? { ...current, profiles: current.profiles.map((item) => item.id === profile ? { ...item, mapColour: color } : item) } : current) } : undefined} />
+      <ProfileTripsPanel atlasId={membership.atlasId} personId={activeProfile?.personId} personName={activeProfile?.name || 'Traveller'} onOpenTrip={handleOpenTrip} onAddTrip={handleAddTripForPerson} />
+    </>}
+  </div>
 }

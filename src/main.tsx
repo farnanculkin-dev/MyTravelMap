@@ -4,6 +4,7 @@ import App from './App'
 import './styles.css'
 import './trip-content.css'
 import './trip-edit.css'
+import './v2b-media.css'
 import { checkSupabaseConnectivity } from './lib/supabaseConnectivity'
 
 if (import.meta.env.DEV) {

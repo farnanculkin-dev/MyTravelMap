@@ -2,7 +2,7 @@ import { supabase } from './supabaseClient'
 
 export type TripPlace = { id:string; tripId:string; name:string; category?:string; countryId?:string; note?:string; latitude?:number; longitude?:number }
 export type PersonMapPlace = TripPlace & { tripTitle:string }
-export type TripMemory = { id:string; tripId:string; placeId?:string; personId?:string; title:string; body?:string; memoryDate?:string; photoUrl?:string }
+export type TripMemory = { id:string; tripId:string; placeId?:string; personId?:string; title:string; body?:string; memoryDate?:string; photoUrl?:string; photoPath?:string }
 export type TripPhoto = { id:string; tripId:string; storagePath:string; caption?:string; signedUrl?:string }
 
 async function sign(path?: string | null) {
@@ -27,7 +27,7 @@ export async function loadTripContent(tripId:string):Promise<{places:TripPlace[]
   if (ie) throw new Error(`Could not load photos: ${ie.message}`)
   return {
     places:(places||[]).map(mapPlace),
-    memories:await Promise.all((memories||[]).map(async(r:any)=>({id:r.id,tripId:r.trip_id,...(r.place_id?{placeId:r.place_id}:{}),...(r.person_id?{personId:r.person_id}:{}),title:r.title,...(r.body?{body:r.body}:{}),...(r.memory_date?{memoryDate:r.memory_date}:{}),...(r.photo_path?{photoUrl:await sign(r.photo_path)}:{})}))),
+    memories:await Promise.all((memories||[]).map(async(r:any)=>({id:r.id,tripId:r.trip_id,...(r.place_id?{placeId:r.place_id}:{}),...(r.person_id?{personId:r.person_id}:{}),title:r.title,...(r.body?{body:r.body}:{}),...(r.memory_date?{memoryDate:r.memory_date}:{}),...(r.photo_path?{photoPath:r.photo_path,photoUrl:await sign(r.photo_path)}:{})}))),
     photos:await Promise.all((media||[]).map(async(r:any)=>({id:r.id,tripId:r.trip_id,storagePath:r.storage_path,...(r.caption?{caption:r.caption}:{}),signedUrl:await sign(r.storage_path)}))),
   }
 }
@@ -105,3 +105,12 @@ export async function uploadMemoryPhoto(input:{atlasId:string;tripId:string;memo
   const {error}=await supabase.from('trip_memories').update({photo_path:path}).eq('id',input.memoryId)
   if(error) throw new Error(`Could not save memory photo: ${error.message}`)
 }
+
+export async function deleteTripPhoto(photo:TripPhoto){
+  const {error:storageError}=await supabase.storage.from('atlas-media').remove([photo.storagePath]); if(storageError)throw new Error(`Could not remove photo file: ${storageError.message}`)
+  const {error}=await supabase.from('trip_media').delete().eq('id',photo.id); if(error)throw new Error(`Could not remove trip photo: ${error.message}`)
+}
+export async function deleteTripPlace(placeId:string){const {error}=await supabase.from('trip_places').delete().eq('id',placeId);if(error)throw new Error(`Could not remove place: ${error.message}`)}
+export async function deleteTripMemory(memory:TripMemory){if(memory.photoPath){const {error:storageError}=await supabase.storage.from('atlas-media').remove([memory.photoPath]);if(storageError)throw new Error(`Could not remove memory photo: ${storageError.message}`)}const {error}=await supabase.from('trip_memories').delete().eq('id',memory.id);if(error)throw new Error(`Could not remove memory: ${error.message}`)}
+export async function deleteMemoryPhoto(memory:TripMemory){if(memory.photoPath){const {error:storageError}=await supabase.storage.from('atlas-media').remove([memory.photoPath]);if(storageError)throw new Error(`Could not remove memory photo file: ${storageError.message}`)}const {error}=await supabase.from('trip_memories').update({photo_path:null}).eq('id',memory.id);if(error)throw new Error(`Could not remove memory photo: ${error.message}`)}
+export async function deleteTripCoverPhoto(tripId:string){const {data,error:readError}=await supabase.from('trips').select('cover_photo_path').eq('id',tripId).single();if(readError)throw new Error(`Could not read cover photo: ${readError.message}`);if(data?.cover_photo_path){const {error:storageError}=await supabase.storage.from('atlas-media').remove([data.cover_photo_path]);if(storageError)throw new Error(`Could not remove cover photo file: ${storageError.message}`)}const {error}=await supabase.from('trips').update({cover_photo_path:null}).eq('id',tripId);if(error)throw new Error(`Could not remove cover photo: ${error.message}`)}
