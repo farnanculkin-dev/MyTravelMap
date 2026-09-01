@@ -6,6 +6,7 @@ import './trip-content.css'
 import './trip-edit.css'
 import './v2b-media.css'
 import './ux-audit.css'
+import './world-map.css'
 import { checkSupabaseConnectivity } from './lib/supabaseConnectivity'
 
 if (import.meta.env.DEV) {
