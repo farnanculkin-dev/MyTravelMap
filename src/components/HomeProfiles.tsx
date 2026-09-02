@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { Profile } from '../domain'
 import { compressImage, getStoredImage, storeImage } from '../lib/ImageStorage'
 
@@ -37,6 +37,10 @@ export default function HomeProfiles({ profiles, onSelect, groupImage: cloudGrou
     }
   }
 
+  const profileGridStyle = {
+    '--profile-count': Math.max(1, profiles.length),
+  } as CSSProperties
+
   return (
     <main className="home">
       <div className="home-title-row">
@@ -61,7 +65,7 @@ export default function HomeProfiles({ profiles, onSelect, groupImage: cloudGrou
           <div className="group-photo-placeholder" aria-hidden="true">Add a family photograph</div>
         )}
       </section>
-      <div className="profiles">
+      <div className="profiles" style={profileGridStyle}>
         {profiles.map((p) => (
           <article key={p.id} className="profile-card" onClick={() => onSelect(p.id)}>
             <button className="profile-btn" type="button">
