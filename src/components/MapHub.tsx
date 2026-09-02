@@ -1,9 +1,6 @@
 import React, { useState } from 'react'
-import MapView from './MapView'
 import WorldMapView, { type WorldRegion } from './WorldMapView'
 import { TravelRepository } from '../lib/TravelRepository'
-
-type MapMode = 'europe' | WorldRegion
 
 export default function MapHub({
   profile,
@@ -30,13 +27,14 @@ export default function MapHub({
   onSaveVisited?: (visitedCountryIds: string[]) => Promise<void>
   onSaveMapColor?: (color: string) => Promise<void>
 }) {
-  const [mode, setMode] = useState<MapMode>('europe')
+  const [mode, setMode] = useState<WorldRegion>('europe')
   const shared = { profile, personId, profileName, defaultMapColor, onBack, onOpenPlace, travelRepo, cloudVisited, cloudMapColor, onSaveVisited, onSaveMapColor }
 
-  const choices: Array<{ id: MapMode; label: string }> = [
+  const choices: Array<{ id: WorldRegion; label: string }> = [
     { id: 'world', label: 'World' },
     { id: 'europe', label: 'Europe' },
-    { id: 'americas', label: 'Americas' },
+    { id: 'northAmerica', label: 'North America' },
+    { id: 'southAmerica', label: 'South America' },
     { id: 'asia', label: 'Asia' },
     { id: 'africa', label: 'Africa' },
     { id: 'oceania', label: 'Australia & Pacific' },
@@ -46,6 +44,6 @@ export default function MapHub({
     <nav className="map-region-nav" aria-label="Map region shortcuts">
       {choices.map((choice) => <button key={choice.id} type="button" className={mode === choice.id ? 'active' : ''} aria-pressed={mode === choice.id} onClick={() => setMode(choice.id)}>{choice.label}</button>)}
     </nav>
-    {mode === 'europe' ? <MapView {...shared} /> : <WorldMapView {...shared} region={mode} />}
+    <WorldMapView {...shared} region={mode} />
   </>
 }
