@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { feature } from 'topojson-client'
 import * as d3 from 'd3-geo'
 import countries from '../data/countries.json'
 import { TravelRepository } from '../lib/TravelRepository'
 import { addProfileMapPlace, deleteProfileMapPlace, geocodePlace, loadPersonMapPlaces, type PersonMapPlace } from '../lib/TripContentRuntime'
+import DetailedWorldMapCanvas from './DetailedWorldMapCanvas'
 
 const MAP_COLORS = [
   { name: 'Green', value: '#4fb6a1' },
@@ -15,12 +16,8 @@ const MAP_COLORS = [
 
 export type WorldRegion = 'world' | 'americas' | 'asia' | 'africa' | 'oceania'
 
-type Transform = { x: number; y: number; k: number }
 type CountryMeta = { id: string; name: string; feature: any; region: string }
-type DragState = { pointerId: number; x: number; y: number; tx: number; ty: number; moved: boolean }
 
-const VIEWBOX_W = 960
-const VIEWBOX_H = 560
 const WORLD_TOPO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json'
 
 function normalizeName(value: string) {
@@ -37,7 +34,6 @@ const EUROPE_ALIASES: Record<string, string> = {
   'macedonia': 'MK',
 }
 
-// Explicit grouping prevents centroid-based mistakes around Europe, the Caucasus and the Middle East.
 const EUROPE_NAMES = new Set([
   'albania', 'andorra', 'armenia', 'austria', 'azerbaijan', 'belarus', 'belgium',
   'bosnia and herzegovina', 'bulgaria', 'croatia', 'cyprus', 'czech republic', 'czechia',
@@ -110,13 +106,6 @@ export default function WorldMapView({
   const [quickPlaceName, setQuickPlaceName] = useState('')
   const [placeBusy, setPlaceBusy] = useState(false)
   const [markerError, setMarkerError] = useState<string | null>(null)
-  const [transform, setTransform] = useState<Transform>({ x: 0, y: 0, k: 1 })
-  const svgRef = useRef<SVGSVGElement | null>(null)
-  const dragRef = useRef<DragState | null>(null)
-  const didDragRef = useRef(false)
-
-  const projection = useMemo(() => d3.geoNaturalEarth1().fitExtent([[12, 12], [VIEWBOX_W - 12, VIEWBOX_H - 12]], { type: 'Sphere' } as any), [])
-  const pathGen = useMemo(() => d3.geoPath().projection(projection as any), [projection])
 
   useEffect(() => {
     setVisited(new Set(cloudVisited || travelRepo.getVisited(profile)))
@@ -245,86 +234,6 @@ export default function WorldMapView({
     finally { setPlaceBusy(false) }
   }
 
-  useEffect(() => {
-    const presets: Record<WorldRegion, { lon: number; lat: number; k: number }> = {
-      world: { lon: 0, lat: 5, k: 1 },
-      americas: { lon: -80, lat: 15, k: 1.65 },
-      asia: { lon: 90, lat: 30, k: 1.7 },
-      africa: { lon: 20, lat: 5, k: 2.05 },
-      oceania: { lon: 145, lat: -20, k: 2.2 },
-    }
-    const preset = presets[region]
-    if (preset.k === 1) { setTransform({ x: 0, y: 0, k: 1 }); return }
-    const point = projection([preset.lon, preset.lat])
-    if (!point) return
-    setTransform({ x: VIEWBOX_W / 2 - point[0] * preset.k, y: VIEWBOX_H / 2 - point[1] * preset.k, k: preset.k })
-  }, [projection, region])
-
-  // React's delegated wheel event can be passive in the browser. A native non-passive listener
-  // guarantees that zooming the map does not also scroll the page.
-  useEffect(() => {
-    const svg = svgRef.current
-    if (!svg) return
-    const handleWheel = (event: WheelEvent) => {
-      event.preventDefault()
-      event.stopPropagation()
-      const rect = svg.getBoundingClientRect()
-      if (!rect.width || !rect.height) return
-      const px = (event.clientX - rect.left) * VIEWBOX_W / rect.width
-      const py = (event.clientY - rect.top) * VIEWBOX_H / rect.height
-      const factor = event.deltaY < 0 ? 1.2 : 1 / 1.2
-      setTransform((current) => {
-        const nextK = Math.max(1, Math.min(12, current.k * factor))
-        const worldX = (px - current.x) / current.k
-        const worldY = (py - current.y) / current.k
-        return { k: nextK, x: px - worldX * nextK, y: py - worldY * nextK }
-      })
-    }
-    svg.addEventListener('wheel', handleWheel, { passive: false })
-    return () => svg.removeEventListener('wheel', handleWheel)
-  }, [])
-
-  function handlePointerDown(event: React.PointerEvent<SVGSVGElement>) {
-    if (event.pointerType === 'mouse' && event.button !== 0) return
-    event.preventDefault()
-    didDragRef.current = false
-    dragRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, tx: transform.x, ty: transform.y, moved: false }
-    try { event.currentTarget.setPointerCapture(event.pointerId) } catch { /* capture may fail if the pointer ended early */ }
-  }
-
-  function handlePointerMove(event: React.PointerEvent<SVGSVGElement>) {
-    const drag = dragRef.current
-    if (!drag || drag.pointerId !== event.pointerId) return
-    const rect = event.currentTarget.getBoundingClientRect()
-    if (!rect.width || !rect.height) return
-    const dxPixels = event.clientX - drag.x
-    const dyPixels = event.clientY - drag.y
-    if (!drag.moved && Math.hypot(dxPixels, dyPixels) > 3) {
-      drag.moved = true
-      didDragRef.current = true
-    }
-    const dx = dxPixels * VIEWBOX_W / rect.width
-    const dy = dyPixels * VIEWBOX_H / rect.height
-    setTransform((current) => ({ ...current, x: drag.tx + dx, y: drag.ty + dy }))
-  }
-
-  function stopDrag(event: React.PointerEvent<SVGSVGElement>) {
-    const drag = dragRef.current
-    if (drag?.pointerId === event.pointerId) {
-      try {
-        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
-      } catch { /* safe cleanup */ }
-      dragRef.current = null
-      window.setTimeout(() => { didDragRef.current = false }, 0)
-    }
-  }
-
-  function handleCountryClick(event: React.MouseEvent, country: CountryMeta) {
-    event.stopPropagation()
-    if (didDragRef.current) return
-    void toggleCountry(country)
-  }
-
   return <div className="map-view world-map-view">
     <header className="map-header">
       <button className="back-btn" onClick={onBack}>← Back</button>
@@ -338,34 +247,21 @@ export default function WorldMapView({
 
     <div className="map-workspace world-map-workspace">
       <div className="map-container world-map-container">
-        <div className="world-map-zoom-hint">Scroll/pinch to zoom · drag to move · use the region buttons above for a quick jump</div>
-        <svg ref={svgRef} viewBox={`0 0 ${VIEWBOX_W} ${VIEWBOX_H}`} className="svg-map world-svg-map" role="img" aria-label="Interactive world travel map" onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={stopDrag} onPointerCancel={stopDrag}>
-          <rect width={VIEWBOX_W} height={VIEWBOX_H} fill="#f8fcfb" />
-          <g transform={`translate(${transform.x} ${transform.y}) scale(${transform.k})`}>
-            {features.map((item) => {
-              const meta = countryByFeatureId.get(item.id)
-              if (!meta || normalizeName(meta.name) === 'antarctica') return null
-              return <path key={item.id} d={pathGen(item as any) || undefined} fill={isVisited(meta) ? mapColor : '#fff'} stroke="#3e5452" strokeWidth={0.55 / transform.k} vectorEffect="non-scaling-stroke" onClick={(event) => handleCountryClick(event, meta)} style={{ cursor: 'pointer' }}><title>{meta.name}</title></path>
-            })}
-            {placeMarkers.map((place) => {
-              if (typeof place.latitude !== 'number' || typeof place.longitude !== 'number') return null
-              const point = projection([place.longitude, place.latitude])
-              if (!point) return null
-              const canOpen = place.source === 'trip' && !!place.tripId && !!onOpenPlace
-              const label = place.tripTitle ? `${place.name} · ${place.tripTitle}` : place.name
-              return <g key={`${place.source}-${place.id}`} transform={`translate(${point[0]} ${point[1]})`} role={canOpen ? 'button' : undefined} tabIndex={canOpen ? 0 : undefined} onClick={(event) => { event.stopPropagation(); if (!didDragRef.current && canOpen && place.tripId) onOpenPlace?.(place.tripId, place.id) }} style={{ cursor: canOpen ? 'pointer' : 'default' }}>
-                <circle r={6 / transform.k} fill="#111" stroke="#fff" strokeWidth={2 / transform.k} />
-                <title>{label}</title>
-              </g>
-            })}
-          </g>
-        </svg>
-        <div className="world-map-controls"><button type="button" onClick={() => setTransform({ x: 0, y: 0, k: 1 })}>Reset view</button><span>{Math.round(transform.k * 100)}%</span></div>
+        <DetailedWorldMapCanvas
+          features={features}
+          countryByFeatureId={countryByFeatureId}
+          mapColor={mapColor}
+          isVisited={isVisited}
+          onToggleCountry={(country) => void toggleCountry(country)}
+          placeMarkers={placeMarkers}
+          onOpenPlace={onOpenPlace}
+          region={region}
+        />
       </div>
 
       <aside className="country-checklist world-country-checklist" aria-label="World country checklist">
         <h3>Countries</h3>
-        <p className="country-help">Tick a country or click its name to add a city/place. Europe keeps its detailed Family Atlas map in the Europe view.</p>
+        <p className="country-help">Tick a country or click its name to add a city/place. The detailed world map can now zoom from country level down to cities and streets.</p>
         {grouped.map((group) => <details key={group.name} open={group.name.toLowerCase().startsWith(region === 'oceania' ? 'australia' : region) || region === 'world'}>
           <summary>{group.name}</summary>
           <div className="country-list">
