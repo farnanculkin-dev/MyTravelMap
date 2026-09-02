@@ -19,14 +19,15 @@ type Props = {
 const LEAFLET_CSS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
 const LEAFLET_JS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
 
+// Continent shortcuts are deliberately framed with breathing room so the whole region is visible.
 const REGION_VIEWS: Record<WorldRegion, { center: [number, number]; zoom: number }> = {
   world: { center: [16, 5], zoom: 2 },
-  europe: { center: [53, 15], zoom: 4.35 },
-  northAmerica: { center: [43, -101], zoom: 3.7 },
-  southAmerica: { center: [-18, -61], zoom: 4.0 },
-  asia: { center: [35, 88], zoom: 3.75 },
-  africa: { center: [4, 20], zoom: 4.25 },
-  oceania: { center: [-24, 145], zoom: 4.3 },
+  europe: { center: [52, 15], zoom: 3.75 },
+  northAmerica: { center: [42, -103], zoom: 3.15 },
+  southAmerica: { center: [-18, -61], zoom: 3.4 },
+  asia: { center: [34, 88], zoom: 3.15 },
+  africa: { center: [3, 20], zoom: 3.55 },
+  oceania: { center: [-25, 134], zoom: 3.65 },
 }
 
 function loadLeaflet(): Promise<LeafletApi> {
@@ -88,6 +89,8 @@ export default function DetailedWorldMapCanvas({
         zoom: REGION_VIEWS.world.zoom,
         minZoom: 2,
         maxZoom: 18,
+        zoomSnap: 0.25,
+        zoomDelta: 0.5,
         scrollWheelZoom: true,
         wheelDebounceTime: 35,
         wheelPxPerZoomLevel: 70,
@@ -95,9 +98,11 @@ export default function DetailedWorldMapCanvas({
         preferCanvas: true,
       })
 
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; OpenStreetMap contributors',
+      // A subdued basemap keeps Family Atlas travel colours and markers visually dominant.
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 20,
+        subdomains: 'abcd',
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
       }).addTo(map)
 
       map.getContainer().addEventListener('wheel', (event: WheelEvent) => {
@@ -145,10 +150,10 @@ export default function DetailedWorldMapCanvas({
         const meta = feature ? countryByFeatureId.get(feature.id) : undefined
         const visited = meta ? isVisited(meta) : false
         return {
-          color: visited ? mapColor : '#56706d',
-          weight: visited ? 1.35 : 0.75,
+          color: visited ? '#58716e' : '#829795',
+          weight: visited ? 0.9 : 0.55,
           fillColor: visited ? mapColor : '#ffffff',
-          fillOpacity: visited ? 0.23 : 0.02,
+          fillOpacity: visited ? 0.28 : 0.01,
         }
       },
       onEachFeature: (mapFeature: any, layer: any) => {
