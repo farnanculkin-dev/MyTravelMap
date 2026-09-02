@@ -14,7 +14,6 @@ export async function loadGuestPeople(excludedPersonIds: string[] = []): Promise
   const { data, error } = await supabase
     .from('people')
     .select('id, display_name')
-    .eq('person_type', 'guest')
     .order('display_name')
 
   if (error) throw new Error(`Could not load people: ${error.message}`)
