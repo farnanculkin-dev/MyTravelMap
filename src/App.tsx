@@ -8,7 +8,6 @@ import HomeProfiles from './components/HomeProfiles'
 import MapHub from './components/MapHub'
 import ProfileTripsPanel from './components/ProfileTripsPanel'
 import TripsScreen from './components/TripsScreen'
-import FamilyTimeline from './components/FamilyTimeline'
 import { LocalStorageTravelRepository } from './lib/LocalStorageTravelRepository'
 import { TravelRepository } from './lib/TravelRepository'
 import { CUSTOMER_ZERO_ATLAS, CUSTOMER_ZERO_PROFILES } from './data/customerZero'
@@ -24,7 +23,7 @@ const profileRepo = new LocalSeedProfileRepository(CUSTOMER_ZERO_PROFILES)
 const atlas = atlasRepo.getAtlas(CUSTOMER_ZERO_ATLAS.id)!
 const fallbackProfiles = profileRepo.getProfiles(atlas.id)
 
-type AppSection = 'home' | 'trips' | 'timeline' | 'settings'
+type AppSection = 'home' | 'trips' | 'settings'
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -37,7 +36,10 @@ export default function App() {
   const [cloudLoading, setCloudLoading] = useState(false)
   const [cloudError, setCloudError] = useState<string | null>(null)
   const [profile, setProfile] = useState<string | null>(null)
-  const [section, setSection] = useState<AppSection>(() => new URLSearchParams(window.location.search).has('trip') ? 'trips' : 'home')
+  const [section, setSection] = useState<AppSection>(() => {
+    const params = new URLSearchParams(window.location.search)
+    return params.has('trip') || params.has('newTripPerson') || params.has('newTrip') || params.has('timeline') ? 'trips' : 'home'
+  })
   const [newTripPersonId,setNewTripPersonId]=useState<string|null>(()=>new URLSearchParams(window.location.search).get('newTripPerson'))
   const activeProfiles = cloudData?.profiles || fallbackProfiles
 
@@ -86,7 +88,6 @@ export default function App() {
   const handleHome = () => { setProfile(null); setSection('home'); setNewTripPersonId(null); window.history.pushState({}, '', window.location.pathname) }
   const handleMyMap = () => { if (!membership) return; setSection('home'); setProfile(membership.profileId); setNewTripPersonId(null); window.history.pushState({}, '', `?profile=${membership.profileId}`) }
   const handleOpenTrips = () => { setProfile(null); setNewTripPersonId(null); setSection('trips'); window.history.replaceState({}, '', window.location.pathname) }
-  const handleOpenTimeline = () => { setProfile(null); setNewTripPersonId(null); setSection('timeline'); window.history.replaceState({}, '', `${window.location.pathname}?timeline=1`) }
   const handleOpenSettings = () => { setProfile(null); setNewTripPersonId(null); setSection('settings'); window.history.replaceState({}, '', window.location.pathname) }
   const handleOpenTrip = (tripId: string) => { setProfile(null); setNewTripPersonId(null); window.history.replaceState({}, '', `${window.location.pathname}?trip=${encodeURIComponent(tripId)}`); setSection('trips') }
   const handleOpenPlace = (tripId:string, placeId:string) => { setProfile(null); setNewTripPersonId(null); window.history.replaceState({}, '', `${window.location.pathname}?trip=${encodeURIComponent(tripId)}&place=${encodeURIComponent(placeId)}`); setSection('trips') }
@@ -101,7 +102,7 @@ export default function App() {
   if (!membership) return <AtlasSetupScreen onCreate={handleCreateAtlas} isCreating={isCreatingAtlas} error={membershipError} onSignOut={handleSignOut} />
 
   const activeProfile = activeProfiles.find((current) => current.id === profile)
-  const activeNav = section === 'trips' ? 'trips' : section === 'timeline' ? 'timeline' : section === 'settings' ? 'settings' : profile === membership.profileId ? 'map' : 'home'
+  const activeNav = section === 'trips' ? 'trips' : section === 'settings' ? 'settings' : profile === membership.profileId ? 'map' : 'home'
   const uploadImage = async (kind: 'group' | 'profile', profileId: string | undefined, imageData: string) => {
     if (kind === 'group' && membership.role !== 'admin') throw new Error('Only an Atlas administrator can change the group photo.')
     const signedUrl = await uploadCloudMedia({ atlasId: membership.atlasId, profileId, kind, dataUrl: imageData })
@@ -109,9 +110,9 @@ export default function App() {
   }
 
   return <div className="app">
-    <AppHeader email={session.user.email} active={activeNav} onHome={handleHome} onMap={handleMyMap} onTrips={handleOpenTrips} onTimeline={handleOpenTimeline} onSettings={handleOpenSettings} onSignOut={handleSignOut} />
+    <AppHeader email={session.user.email} active={activeNav} onHome={handleHome} onMap={handleMyMap} onTrips={handleOpenTrips} onSettings={handleOpenSettings} onSignOut={handleSignOut} />
     {cloudError && <p className="cloud-error" role="alert">Cloud data could not be loaded. Showing local fallback data. {cloudError}</p>}
-    {section === 'settings' ? <main className="settings-screen"><div className="settings-title"><p className="auth-eyebrow">Family Atlas</p><h1>Settings</h1><p>Manage family access and account setup without cluttering your travel pages.</p></div>{membership.role === 'admin' ? <MemberInvitePanel atlasId={membership.atlasId} profiles={activeProfiles} /> : <section className="settings-card"><h2>Family access</h2><p>Only an Atlas administrator can invite another member.</p></section>}</main> : section === 'timeline' ? <FamilyTimeline atlasId={membership.atlasId} onOpenTrip={handleOpenTrip} /> : section === 'trips' ? <TripsScreen atlasId={membership.atlasId} profiles={activeProfiles} onBack={handleHome} initialParticipantId={newTripPersonId||undefined} /> : !profile ? <HomeProfiles profiles={activeProfiles} onSelect={handleSelectProfile} groupImage={cloudData?.groupImage} profileImages={cloudData?.profileImages} onUploadImage={cloudData ? uploadImage : undefined} /> : <>
+    {section === 'settings' ? <main className="settings-screen"><div className="settings-title"><p className="auth-eyebrow">Family Atlas</p><h1>Settings</h1><p>Manage family access and account setup without cluttering your travel pages.</p></div>{membership.role === 'admin' ? <MemberInvitePanel atlasId={membership.atlasId} profiles={activeProfiles} /> : <section className="settings-card"><h2>Family access</h2><p>Only an Atlas administrator can invite another member.</p></section>}</main> : section === 'trips' ? <TripsScreen atlasId={membership.atlasId} profiles={activeProfiles} onBack={handleHome} initialParticipantId={newTripPersonId||undefined} /> : !profile ? <HomeProfiles profiles={activeProfiles} onSelect={handleSelectProfile} groupImage={cloudData?.groupImage} profileImages={cloudData?.profileImages} onUploadImage={cloudData ? uploadImage : undefined} /> : <>
       <MapHub profile={profile} personId={activeProfile?.personId} profileName={activeProfile?.name} defaultMapColor={activeProfile?.mapColour} onBack={handleHome} onOpenPlace={handleOpenPlace} travelRepo={travelRepo} cloudVisited={cloudData?.visitedByProfile[profile]} cloudMapColor={activeProfile?.mapColour} onSaveVisited={cloudData ? (visited) => saveCloudVisited(profile, visited) : undefined} onSaveMapColor={cloudData ? async (color) => { await saveCloudMapColour(profile, color); setCloudData((current) => current ? { ...current, profiles: current.profiles.map((item) => item.id === profile ? { ...item, mapColour: color } : item) } : current) } : undefined} />
       <ProfileTripsPanel atlasId={membership.atlasId} personId={activeProfile?.personId} personName={activeProfile?.name || 'Traveller'} onOpenTrip={handleOpenTrip} onAddTrip={handleAddTripForPerson} />
     </>}
