@@ -50,7 +50,7 @@ export default function ConnectionsPanel({ atlasId }: { atlasId: string }) {
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Invitation could not be sent.') }
   }
 
-  if (selectedConnectionId) return <ConnectedProfilePanel connectionId={selectedConnectionId} onBack={() => setSelectedConnectionId(null)} />
+  if (selectedConnectionId) return <ConnectedProfilePanel atlasId={atlasId} connectionId={selectedConnectionId} onBack={() => setSelectedConnectionId(null)} />
 
   return <section className="settings-card connections-card" aria-labelledby="connections-title">
     <p className="auth-eyebrow">Trusted circle</p>
