@@ -18,7 +18,7 @@ function tripYear(trip: Trip) {
   return Number.isFinite(year) ? year : new Date().getFullYear()
 }
 
-export default function FamilyTimeline({ atlasId, onOpenTrip }: { atlasId: string; onOpenTrip: (tripId: string) => void }) {
+export default function FamilyTimeline({ atlasId, onOpenTrip, onAddTrip }: { atlasId: string; onOpenTrip: (tripId: string) => void; onAddTrip: () => void }) {
   const [trips, setTrips] = useState<Trip[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -29,7 +29,7 @@ export default function FamilyTimeline({ atlasId, onOpenTrip }: { atlasId: strin
     setError(null)
     loadTrips(atlasId)
       .then((items) => { if (mounted) setTrips(items) })
-      .catch((timelineError: unknown) => { if (mounted) setError(timelineError instanceof Error ? timelineError.message : 'Timeline could not be loaded.') })
+      .catch((timelineError: unknown) => { if (mounted) setError(timelineError instanceof Error ? timelineError.message : 'Trips could not be loaded.') })
       .finally(() => { if (mounted) setLoading(false) })
     return () => { mounted = false }
   }, [atlasId])
@@ -44,15 +44,18 @@ export default function FamilyTimeline({ atlasId, onOpenTrip }: { atlasId: strin
   }, [trips])
 
   return <main className="timeline-screen">
-    <div className="timeline-title">
-      <p className="auth-eyebrow">Family Atlas</p>
-      <h1>Timeline</h1>
-      <p>Your family journeys in date order — a growing record of the places, trips and memories you share.</p>
+    <div className="timeline-title-row">
+      <div className="timeline-title">
+        <p className="auth-eyebrow">Family Atlas</p>
+        <h1>My Trips</h1>
+        <p>Your journeys in date order — a growing record of the places, trips and memories you share.</p>
+      </div>
+      <button className="primary-btn timeline-add-btn" type="button" onClick={onAddTrip}>+ Add trip</button>
     </div>
 
-    {loading ? <p role="status">Loading your timeline…</p> : null}
+    {loading ? <p role="status">Loading your trips…</p> : null}
     {error ? <p className="auth-error" role="alert">{error}</p> : null}
-    {!loading && !error && trips.length === 0 ? <section className="timeline-empty"><h2>Your timeline starts with your first trip</h2><p>Add a trip and it will automatically appear here.</p></section> : null}
+    {!loading && !error && trips.length === 0 ? <section className="timeline-empty"><h2>Your travel story starts here</h2><p>Add a recent holiday or a trip from years ago. It will appear here automatically.</p><button className="primary-btn" type="button" onClick={onAddTrip}>+ Add your first trip</button></section> : null}
 
     <div className="timeline-years">
       {grouped.map(([year, yearTrips]) => <section className="timeline-year" key={year}>
