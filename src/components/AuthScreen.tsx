@@ -1,6 +1,8 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 
+const DEVELOP_REVIEW_ORIGIN = 'https://my-travel-map-git-develop-farnanculkin-devs-projects.vercel.app'
+
 function friendlyAuthError(message: string): string {
   const normalized = message.toLowerCase()
   if (normalized.includes('rate limit') || normalized.includes('too many') || normalized.includes('email rate')) {
@@ -12,6 +14,14 @@ function friendlyAuthError(message: string): string {
 function isRateLimitError(message: string): boolean {
   const normalized = message.toLowerCase()
   return normalized.includes('rate limit') || normalized.includes('too many') || normalized.includes('email rate')
+}
+
+function getEmailRedirectOrigin(): string {
+  // Vercel's Visit button can open an immutable deployment URL. Those one-off hostnames are
+  // not guaranteed to be allow-listed in Supabase, which can make Auth fall back to localhost.
+  // Always return preview sign-ins to the stable develop alias instead.
+  if (window.location.hostname.endsWith('.vercel.app')) return DEVELOP_REVIEW_ORIGIN
+  return window.location.origin
 }
 
 export default function AuthScreen() {
@@ -45,7 +55,7 @@ export default function AuthScreen() {
     const { error: signInError } = await supabase.auth.signInWithOtp({
       email: email.trim(),
       options: {
-        emailRedirectTo: window.location.origin,
+        emailRedirectTo: getEmailRedirectOrigin(),
       },
     })
 
