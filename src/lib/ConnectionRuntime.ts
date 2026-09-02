@@ -22,9 +22,9 @@ type ConnectionRow = {
   people: { display_name: string } | { display_name: string }[] | null
 }
 
-function redirectOrigin(): string {
-  if (window.location.hostname.endsWith('.vercel.app')) return DEVELOP_REVIEW_ORIGIN
-  return window.location.origin
+function invitationRedirectUrl(): string {
+  const origin = window.location.hostname.endsWith('.vercel.app') ? DEVELOP_REVIEW_ORIGIN : window.location.origin
+  return `${origin}/?connectionInvite=1`
 }
 
 export async function loadAtlasConnections(atlasId: string): Promise<AtlasConnection[]> {
@@ -71,17 +71,16 @@ export async function createAtlasConnection(input: {
 
 export async function inviteAtlasConnection(connectionId: string, email: string): Promise<void> {
   const cleanedEmail = email.trim()
-  const { error } = await supabase.rpc('invite_atlas_connection', {
-    p_connection_id: connectionId,
-    p_email: cleanedEmail,
+  const { data, error } = await supabase.functions.invoke('invite-atlas-connection', {
+    body: {
+      connectionId,
+      email: cleanedEmail,
+      redirectTo: invitationRedirectUrl(),
+    },
   })
-  if (error) throw new Error(`Could not prepare connection invitation: ${error.message}`)
 
-  const { error: emailError } = await supabase.auth.signInWithOtp({
-    email: cleanedEmail,
-    options: { emailRedirectTo: redirectOrigin() },
-  })
-  if (emailError) throw new Error(`Connection was saved, but the invitation email could not be sent: ${emailError.message}`)
+  if (error) throw new Error(`Connection invitation could not be sent: ${error.message}`)
+  if (data?.error) throw new Error(String(data.error))
 }
 
 export async function consumePendingConnectionInvitation(): Promise<void> {
