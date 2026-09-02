@@ -27,7 +27,7 @@ export default function MapHub({
   onSaveVisited?: (visitedCountryIds: string[]) => Promise<void>
   onSaveMapColor?: (color: string) => Promise<void>
 }) {
-  const [mode, setMode] = useState<WorldRegion>('europe')
+  const [mode, setMode] = useState<WorldRegion>('world')
   const shared = { profile, personId, profileName, defaultMapColor, onBack, onOpenPlace, travelRepo, cloudVisited, cloudMapColor, onSaveVisited, onSaveMapColor }
 
   const choices: Array<{ id: WorldRegion; label: string }> = [
