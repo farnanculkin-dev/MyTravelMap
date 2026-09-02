@@ -98,12 +98,21 @@ export default function DetailedWorldMapCanvas({
         preferCanvas: true,
       })
 
-      // A subdued basemap keeps Family Atlas travel colours and markers visually dominant.
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-        maxZoom: 20,
-        subdomains: 'abcd',
-        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-      }).addTo(map)
+      const cartoKey = String(import.meta.env.VITE_CARTO_BASEMAP_KEY || '').trim()
+      if (cartoKey) {
+        // CARTO's light basemap stays visually quiet so Family Atlas travel colours remain dominant.
+        L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}.png?key=${encodeURIComponent(cartoKey)}`, {
+          maxZoom: 20,
+          subdomains: 'abcd',
+          attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+        }).addTo(map)
+      } else {
+        // Never show CARTO's missing-key watermark or invalid-key tile seams. Development falls back cleanly.
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap contributors',
+        }).addTo(map)
+      }
 
       map.getContainer().addEventListener('wheel', (event: WheelEvent) => {
         event.stopPropagation()
