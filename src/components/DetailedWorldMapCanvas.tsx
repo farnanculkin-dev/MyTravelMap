@@ -100,17 +100,21 @@ export default function DetailedWorldMapCanvas({
 
       const cartoKey = String(import.meta.env.VITE_CARTO_BASEMAP_KEY || '').trim()
       if (cartoKey) {
-        // CARTO's light basemap stays visually quiet so Family Atlas travel colours remain dominant.
-        L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}.png?key=${encodeURIComponent(cartoKey)}`, {
+        // Voyager keeps the map light but restores a friendly pale-blue ocean and clearer place context.
+        L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${encodeURIComponent(cartoKey)}`, {
           maxZoom: 20,
           subdomains: 'abcd',
           attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+          updateWhenIdle: false,
+          keepBuffer: 4,
         }).addTo(map)
       } else {
         // Never show CARTO's missing-key watermark or invalid-key tile seams. Development falls back cleanly.
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           maxZoom: 19,
           attribution: '&copy; OpenStreetMap contributors',
+          updateWhenIdle: false,
+          keepBuffer: 4,
         }).addTo(map)
       }
 
