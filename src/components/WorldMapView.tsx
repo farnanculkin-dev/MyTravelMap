@@ -12,6 +12,11 @@ const MAP_COLORS = [
   { name: 'Red', value: '#d95d5d' },
   { name: 'Orange', value: '#e59a4a' },
   { name: 'Purple', value: '#8b6bb1' },
+  { name: 'Yellow', value: '#e6c84f' },
+  { name: 'Pink', value: '#df79a6' },
+  { name: 'Turquoise', value: '#2fa7a0' },
+  { name: 'Lime', value: '#8bbd45' },
+  { name: 'Navy', value: '#34558b' },
 ]
 
 export type WorldRegion = 'world' | 'europe' | 'northAmerica' | 'southAmerica' | 'asia' | 'africa' | 'oceania'
