@@ -19,15 +19,15 @@ type Props = {
 const LEAFLET_CSS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
 const LEAFLET_JS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
 
-// Continent shortcuts are deliberately framed with breathing room so the whole region is visible.
+// Integer zoom levels avoid raster-tile scaling seams while keeping each shortcut comfortably framed.
 const REGION_VIEWS: Record<WorldRegion, { center: [number, number]; zoom: number }> = {
   world: { center: [16, 5], zoom: 2 },
-  europe: { center: [52, 15], zoom: 3.75 },
-  northAmerica: { center: [42, -103], zoom: 3.15 },
-  southAmerica: { center: [-18, -61], zoom: 3.4 },
-  asia: { center: [34, 88], zoom: 3.15 },
-  africa: { center: [3, 20], zoom: 3.55 },
-  oceania: { center: [-25, 134], zoom: 3.65 },
+  europe: { center: [52, 15], zoom: 4 },
+  northAmerica: { center: [42, -103], zoom: 3 },
+  southAmerica: { center: [-18, -61], zoom: 3 },
+  asia: { center: [34, 88], zoom: 3 },
+  africa: { center: [3, 20], zoom: 3 },
+  oceania: { center: [-25, 134], zoom: 3 },
 }
 
 function loadLeaflet(): Promise<LeafletApi> {
@@ -89,8 +89,10 @@ export default function DetailedWorldMapCanvas({
         zoom: REGION_VIEWS.world.zoom,
         minZoom: 2,
         maxZoom: 18,
-        zoomSnap: 0.25,
-        zoomDelta: 0.5,
+        zoomSnap: 1,
+        zoomDelta: 1,
+        zoomAnimation: false,
+        fadeAnimation: false,
         scrollWheelZoom: true,
         wheelDebounceTime: 35,
         wheelPxPerZoomLevel: 70,
@@ -100,21 +102,23 @@ export default function DetailedWorldMapCanvas({
 
       const cartoKey = String(import.meta.env.VITE_CARTO_BASEMAP_KEY || '').trim()
       if (cartoKey) {
-        // Voyager keeps the map light but restores a friendly pale-blue ocean and clearer place context.
+        // Voyager retains street-level detail; the tile class applies Family Atlas' pale-blue treatment.
         L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${encodeURIComponent(cartoKey)}`, {
           maxZoom: 20,
           subdomains: 'abcd',
           attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
           updateWhenIdle: false,
           keepBuffer: 4,
+          className: 'family-atlas-carto-tile',
         }).addTo(map)
       } else {
-        // Never show CARTO's missing-key watermark or invalid-key tile seams. Development falls back cleanly.
+        // Never show CARTO's missing-key watermark. Development falls back cleanly.
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           maxZoom: 19,
           attribution: '&copy; OpenStreetMap contributors',
           updateWhenIdle: false,
           keepBuffer: 4,
+          className: 'family-atlas-osm-tile',
         }).addTo(map)
       }
 
@@ -144,7 +148,7 @@ export default function DetailedWorldMapCanvas({
     const map = mapRef.current
     if (!map) return
     const preset = REGION_VIEWS[region]
-    map.flyTo(preset.center, preset.zoom, { duration: 0.55 })
+    map.setView(preset.center, preset.zoom, { animate: false })
   }, [region])
 
   useEffect(() => {
