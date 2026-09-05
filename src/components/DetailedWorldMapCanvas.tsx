@@ -18,6 +18,7 @@ type Props = {
 
 const LEAFLET_CSS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
 const LEAFLET_JS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+const COUNTRY_DETAIL_ZOOM = 6
 
 // Integer zoom levels avoid raster-tile scaling seams while keeping each shortcut comfortably framed.
 const REGION_VIEWS: Record<WorldRegion, { center: [number, number]; zoom: number }> = {
@@ -76,6 +77,7 @@ export default function DetailedWorldMapCanvas({
   const mapRef = useRef<any>(null)
   const overlayRef = useRef<any>(null)
   const [mapError, setMapError] = React.useState<string | null>(null)
+  const [zoomLevel, setZoomLevel] = React.useState(REGION_VIEWS.world.zoom)
 
   useEffect(() => {
     let cancelled = false
@@ -102,7 +104,6 @@ export default function DetailedWorldMapCanvas({
 
       const cartoKey = String(import.meta.env.VITE_CARTO_BASEMAP_KEY || '').trim()
       if (cartoKey) {
-        // Voyager retains street-level detail; the tile class applies Family Atlas' pale-blue treatment.
         L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${encodeURIComponent(cartoKey)}`, {
           maxZoom: 20,
           subdomains: 'abcd',
@@ -112,7 +113,6 @@ export default function DetailedWorldMapCanvas({
           className: 'family-atlas-carto-tile',
         }).addTo(map)
       } else {
-        // Never show CARTO's missing-key watermark. Development falls back cleanly.
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           maxZoom: 19,
           attribution: '&copy; OpenStreetMap contributors',
@@ -126,10 +126,13 @@ export default function DetailedWorldMapCanvas({
         event.stopPropagation()
       }, { passive: true })
 
+      map.on('zoomend', () => setZoomLevel(map.getZoom()))
+
       overlayRef.current = L.layerGroup().addTo(map)
       mapRef.current = map
       const preset = REGION_VIEWS[region]
       map.setView(preset.center, preset.zoom, { animate: false })
+      setZoomLevel(preset.zoom)
       requestAnimationFrame(() => map.invalidateSize())
     }).catch((error) => {
       if (!cancelled) setMapError(error instanceof Error ? error.message : 'Detailed map could not be loaded.')
@@ -149,6 +152,7 @@ export default function DetailedWorldMapCanvas({
     if (!map) return
     const preset = REGION_VIEWS[region]
     map.setView(preset.center, preset.zoom, { animate: false })
+    setZoomLevel(preset.zoom)
   }, [region])
 
   useEffect(() => {
@@ -162,15 +166,17 @@ export default function DetailedWorldMapCanvas({
       features: features.filter((feature) => countryByFeatureId.has(feature.id)),
     }
 
+    const closeDetailView = zoomLevel >= COUNTRY_DETAIL_ZOOM
+
     L.geoJSON(featureCollection, {
       style: (feature: any) => {
         const meta = feature ? countryByFeatureId.get(feature.id) : undefined
         const visited = meta ? isVisited(meta) : false
         return {
           color: visited ? '#58716e' : '#829795',
-          weight: visited ? 0.9 : 0.55,
+          weight: closeDetailView ? 0.45 : (visited ? 0.9 : 0.55),
           fillColor: visited ? mapColor : '#ffffff',
-          fillOpacity: visited ? 0.28 : 0.01,
+          fillOpacity: closeDetailView ? 0 : (visited ? 0.28 : 0.01),
         }
       },
       onEachFeature: (mapFeature: any, layer: any) => {
@@ -196,7 +202,7 @@ export default function DetailedWorldMapCanvas({
         marker.on('click', () => onOpenPlace(place.tripId!, place.id))
       }
     })
-  }, [countryByFeatureId, features, isVisited, mapColor, onOpenPlace, onToggleCountry, placeMarkers])
+  }, [countryByFeatureId, features, isVisited, mapColor, onOpenPlace, onToggleCountry, placeMarkers, zoomLevel])
 
   return (
     <div className="detailed-world-map-shell">
